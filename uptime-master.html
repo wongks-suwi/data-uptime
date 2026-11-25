@@ -219,7 +219,7 @@ function render(){
   $('#nav').replaceChildren(...TABS.map(([k,l])=>h('a',{href:'#'+k,'aria-current':k===t?'page':null},l)));
   const root=$('#view');root.replaceChildren();
   if(S.offline)root.append(h('div',{class:'banner'},'เชื่อมต่อฐานข้อมูลไม่ได้ เปิดหน้านี้ผ่าน claude.ai แล้วเข้าสู่ระบบ ข้อมูลจึงจะบันทึกและแสดงได้'));
-  if(!S.offline&&!(S.ready.m&&S.ready.d)){root.append(h('div',{class:'empty'},h('b','กำลังโหลดข้อมูล…'),'รอสักครู่ ระบบกำลังดึงข้อมูลที่บันทึกไว้'));return;}
+  if(!S.offline&&!(S.ready.m&&S.ready.d)){root.append(h('div',{class:'empty'},h('b',null,'กำลังโหลดข้อมูล…'),'รอสักครู่ ระบบกำลังดึงข้อมูลที่บันทึกไว้'));return;}
   ({entry:vEntry,weekly:vWeekly,summary:vSummary,downtime:vDowntime,machines:vMachines,settings:vSettings})[t](root);
 }
 window.addEventListener('hashchange',()=>{pendingRender=false;render();window.scrollTo(0,0);});
@@ -271,7 +271,7 @@ function gridRow(rid,r,idx){
     h('td',{class:'cc'},numIn('wh',r.wh,{title:'ชั่วโมงเดินเครื่องตามแผน เว้นว่าง = เวลามาตรฐาน÷60'})),h('td',{class:'cc'},numIn('ct',r.ct,{title:'CT ระบุเอง (วินาที) เว้นว่าง = ใช้ของเครื่อง'})),
     h('td',{class:'cm'},h('input',{type:'text','data-f':'note',value:r.note||'','aria-label':'หมายเหตุ'})),
     cell('capa'),cell('t100'),cell('upW'),cell('upC'),cell('ngp'),
-    h('td',{class:'c'},h('button',{class:'x',type:'button','data-x':'1',title:'ลบแถว','aria-label':'ลบแถว'},'✕')));
+    h('td',{class:'c'},h('button',{class:'x',type:'button','data-x':'1',title:'ลบแถว','aria-label':'ลบแถว',style:E.armed===rid?'color:var(--bad)':null,'data-armed':E.armed===rid?'1':null},E.armed===rid?'ลบ?':'✕')));
   updateCalc(tr);return tr;
 }
 function fillBody(){
@@ -283,7 +283,7 @@ function vEntry(root){
   if(!E.date)E.date=todayIso();
   const mc=machList().length;
   root.append(h('h2',null,'กรอกข้อมูลรายวัน'),h('p',{class:'sub'},'1 แถว = 1 กะ × 1 เครื่อง × 1 ชิ้นงาน ช่องสีเหลืองคือช่องกรอก ช่องสีเทาคำนวณเอง บันทึกอัตโนมัติเมื่อออกจากช่อง ทุกรายงานดึงจากข้อมูลชุดนี้'));
-  if(S.ready.m&&!mc){root.append(h('div',{class:'empty'},h('b','ยังไม่มีเครื่องในทะเบียน'),'ไปที่แท็บ ',h('a',{href:'#machines'},'เครื่อง'),' เพื่อเพิ่มเครื่อง แล้วกลับมากรอกข้อมูล'));return;}
+  if(S.ready.m&&!mc){root.append(h('div',{class:'empty'},h('b',null,'ยังไม่มีเครื่องในทะเบียน'),'ไปที่แท็บ ',h('a',{href:'#machines'},'เครื่อง'),' เพื่อเพิ่มเครื่อง แล้วกลับมากรอกข้อมูล'));return;}
   const dIn=h('input',{type:'date',id:'edate',value:E.date,onchange:e=>{if(e.target.value){E.date=e.target.value;E.drafts.clear();render();}}});
   const go=n=>()=>{E.date=addDays(E.date,n);E.drafts.clear();render();};
   const sh=(v,l)=>h('button',{type:'button','aria-pressed':String(E.shift===v),onclick:()=>{E.shift=v;render();}},l);
@@ -312,10 +312,10 @@ function vEntry(root){
     if(!row.m){E.drafts.set(tr._rid,row);return;}
     E.drafts.delete(tr._rid);saveRows(E.date,{[tr._rid]:row});});
   tb.addEventListener('click',e=>{const b=e.target.closest('[data-x]');if(!b)return;const tr=b.closest('tr');
-    if(b.dataset.armed){const rid=tr._rid;if(E.drafts.has(rid))E.drafts.delete(rid);else deleteRow(E.date,rid);fillBody();return;}
-    b.dataset.armed='1';b.textContent='ลบ?';b.style.color='var(--bad)';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='✕';b.style.color='';}},3000);});
+    if(b.dataset.armed){const rid=tr._rid;E.armed=null;if(E.drafts.has(rid))E.drafts.delete(rid);else deleteRow(E.date,rid);fillBody();return;}
+    E.armed=tr._rid;b.dataset.armed='1';b.textContent='ลบ?';b.style.color='var(--bad)';clearTimeout(E.armT);E.armT=setTimeout(()=>{E.armed=null;const cur=document.querySelector('#grid [data-armed]');if(cur){delete cur.dataset.armed;cur.textContent='✕';cur.style.color='';}},3000);});
   root.append(h('div',{class:'scroll',style:'max-height:68vh'},grid),
-    h('div',{id:'emptyDay',class:'empty',hidden:true,style:'margin-top:12px'},h('b','วันที่ '+dmy(E.date)+' ยังไม่มีข้อมูล'),'กด “+ เพิ่มแถว” หรือ “สร้างแถวทุกเครื่อง” เพื่อเริ่มกรอก'),
+    h('div',{id:'emptyDay',class:'empty',hidden:true,style:'margin-top:12px'},h('b',null,'วันที่ '+dmy(E.date)+' ยังไม่มีข้อมูล'),'กด “+ เพิ่มแถว” หรือ “สร้างแถวทุกเครื่อง” เพื่อเริ่มกรอก'),
     h('p',{class:'hint'},'%Uptime = (เวลามาตรฐาน − เวลาสูญเสียรวม) ÷ ฐานเวลา เทียบเป้า '+pct(S.set.target,0)+' · เวลาสูญเสียรวม = ผลรวม 16 สาเหตุ (นาที) · OK = ผลิตทั้งหมด − NG · CAPA = Working Hours × 3600 × Efficiency ÷ (CT + Loading) · %Output = OK ÷ CAPA'));
   fillBody();
 }
@@ -734,7 +734,7 @@ function vWeekly(root){
       h('button',{type:'button','aria-pressed':String(R.basis==='capa'),onclick:()=>{R.basis='capa';render();},title:'ยอด OK ÷ CAPA'},'Output ÷ CAPA')),
     h('label',{class:'fld',style:'flex-direction:row;align-items:center;gap:6px'},h('input',{type:'checkbox',checked:R.showAll,onchange:e=>{R.showAll=e.target.checked;render();}}),'แสดงทุกเครื่อง')));
   const mach=machList().filter(m=>R.showAll||rows.some(x=>x.r.m===m.id));
-  if(!mach.length){root.append(h('div',{class:'empty'},h('b','ไม่มีข้อมูลในสัปดาห์นี้'),'เลื่อนสัปดาห์ หรือกรอกข้อมูลในแท็บกรอกข้อมูล'));return;}
+  if(!mach.length){root.append(h('div',{class:'empty'},h('b',null,'ไม่มีข้อมูลในสัปดาห์นี้'),'เลื่อนสัปดาห์ หรือกรอกข้อมูลในแท็บกรอกข้อมูล'));return;}
   root.append(h('div',{class:'legend'},h('span',null,h('i',{class:'dot',style:'background:var(--good)'}),'ถึงเป้า '+pct(S.set.target,0)),h('span',null,h('i',{class:'dot',style:'background:var(--bad)'}),'ต่ำกว่าเป้า'),h('span',null,'คอลัมน์รวมสัปดาห์ = ยอด OK รวม และ % ถ่วงน้ำหนักตามเวลา (รวมเวลาทำงาน ÷ รวมฐานเวลา)')));
   const cellFor=(mid,date,shift)=>{const xs=rows.filter(x=>x.r.m===mid&&x.date===date&&x.r.s===shift);return xs.length?sumUp(xs):null;};
   const th=[h('th',{class:'l',rowspan:2},'เครื่อง'),h('th',{colspan:7,class:'dd'},'กะเช้า'),h('th',{colspan:7,class:'nn'},'กะดึก'),h('th',{colspan:3},'รวมสัปดาห์')];
@@ -761,7 +761,7 @@ function vSummary(root){
   const inP=(p)=>x=>x.date>=p.s&&x.date<=p.e;
   const tot=agg(rows,inP(mon));
   root.append(h('h2',null,'สรุปผล · '+S.set.month),h('p',{class:'sub'},'แทน 생산 종합 현황: Uptime = เวลาทำงานจริงหลังหักเวลาสูญเสีย ÷ ฐานเวลา เทียบเป้า '+pct(S.set.target,0)+' แยกตามประเภทเครื่องและรายเครื่อง ส่วน Output = ยอด OK ÷ CAPA'));
-  if(!rows.length){root.append(h('div',{class:'empty'},h('b','ยังไม่มีข้อมูลในเดือนนี้'),'กรอกข้อมูลในแท็บกรอกข้อมูล หรือเปลี่ยนเดือนในตั้งค่า'));return;}
+  if(!rows.length){root.append(h('div',{class:'empty'},h('b',null,'ยังไม่มีข้อมูลในเดือนนี้'),'กรอกข้อมูลในแท็บกรอกข้อมูล หรือเปลี่ยนเดือนในตั้งค่า'));return;}
   root.append(h('div',{class:'tiles'},
     h('div',{class:'tile'},h('b',{class:tot.up==null?'':(tot.up>=S.set.target?'good':'bad')},pct(tot.up)),h('span',null,'Uptime เวลาจริง · เป้า '+pct(S.set.target,0))),
     h('div',{class:'tile'},h('b',null,f0(tot.ok)),h('span',null,'ยอด OK ทั้งเดือน (ชิ้น)')),
@@ -798,7 +798,7 @@ function vDowntime(root){
     h('label',{class:'fld'},'Line',h('select',{onchange:e=>{R.dtLine=e.target.value;render();},value:R.dtLine},h('option',{value:''},'ทั้งหมด'),...lines.map(l=>h('option',{value:l,selected:l===R.dtLine},l)))),
     h('label',{class:'fld'},'ตั้งแต่',h('input',{type:'date',value:R.dtFrom,onchange:e=>{R.dtFrom=e.target.value;render();}})),
     h('label',{class:'fld'},'ถึง',h('input',{type:'date',value:R.dtTo,onchange:e=>{R.dtTo=e.target.value;render();}}))));
-  if(!sum){root.append(h('div',{class:'empty'},h('b','ไม่มีเวลาหยุดในช่วงนี้'),'ปรับช่วงวันที่หรือ Line'));return;}
+  if(!sum){root.append(h('div',{class:'empty'},h('b',null,'ไม่มีเวลาหยุดในช่วงนี้'),'ปรับช่วงวันที่หรือ Line'));return;}
   const ord=tot.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v||a.i-b.i).filter(x=>x.v>0);
   const mx=ord[0].v;let cum=0,cut=false;const parts=[];
   ord.forEach((x,n)=>{cum+=x.v;parts.push(h('div',{class:'num',style:'color:var(--ink2)'},String(n+1)),h('div',null,CAUSES[x.i][0],h('div',{style:'font-size:11px;color:var(--ink2)'},CAUSES[x.i][2])),
