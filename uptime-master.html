@@ -1,0 +1,869 @@
+<title>Uptime Master</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky top bar + tab nav; content is one full-width working surface per tab.
+   Entry tab is a spreadsheet-style grid (same columns as the Excel Daily_Input), other tabs are reports. */
+:root{
+  --bg:#F2F4F8; --surface:#FFFFFF; --surface2:#E9EDF3; --ink:#142033; --ink2:#53627A; --line:#D3DAE5;
+  --accent:#1E4FD6; --accent-ink:#FFFFFF; --accent-soft:#E3EAFB;
+  --good:#12794A; --good-bg:#D9F2E5; --warn:#8F5A00; --warn-bg:#FBE9C5; --bad:#B3261E; --bad-bg:#F9D9D5;
+  --in:#FFF6D1; --calc:#EDF0F5; --day:#C98400; --night:#4A3FB0;
+  --font:'IBM Plex Sans Thai','Noto Sans Thai',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E141C; --surface:#161F2A; --surface2:#1F2B39; --ink:#E6ECF4; --ink2:#9BABBE; --line:#2B3A4B;
+  --accent:#7D9DFF; --accent-ink:#0B1220; --accent-soft:#1D2B4D;
+  --good:#52C792; --good-bg:#12382A; --warn:#EDB955; --warn-bg:#3A2D0F; --bad:#FF8F85; --bad-bg:#44201D;
+  --in:#2D2A14; --calc:#1D2733; --day:#E8B13F; --night:#A59BFF; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E141C; --surface:#161F2A; --surface2:#1F2B39; --ink:#E6ECF4; --ink2:#9BABBE; --line:#2B3A4B;
+  --accent:#7D9DFF; --accent-ink:#0B1220; --accent-soft:#1D2B4D;
+  --good:#52C792; --good-bg:#12382A; --warn:#EDB955; --warn-bg:#3A2D0F; --bad:#FF8F85; --bad-bg:#44201D;
+  --in:#2D2A14; --calc:#1D2733; --day:#E8B13F; --night:#A59BFF; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+button,input,select{font:inherit;color:inherit}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);margin:0 calc(-1*max(16px,env(safe-area-inset-right,0px))) 0 calc(-1*max(16px,env(safe-area-inset-left,0px)));
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;padding-bottom:8px}
+.brand h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.2px}
+.brand h1 small{font-weight:500;color:var(--ink2);font-size:13px;margin-left:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--ink2);background:var(--surface)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.chip.busy i{background:var(--warn)} .chip.err i{background:var(--bad)}
+nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav a{padding:9px 14px;text-decoration:none;color:var(--ink2);font-weight:500;border-bottom:3px solid transparent;white-space:nowrap}
+nav a:hover{color:var(--ink)} nav a[aria-current="page"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+main{padding-top:18px;min-width:0}
+h2{font-size:16px;margin:0 0 4px;font-weight:700} .sub{color:var(--ink2);margin:0 0 14px;max-width:72ch}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.bar .grow{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)} .btn.pri:hover{filter:brightness(1.08);color:var(--accent-ink)}
+.btn.sm{padding:3px 9px;font-size:12px} .btn:focus-visible,input:focus-visible,select:focus-visible,nav a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer;font-weight:500;color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.fld{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--ink2)}
+.fld input,.fld select{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 8px;color:var(--ink);font-size:14px}
+.scroll{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface);max-width:100%}
+table{border-collapse:separate;border-spacing:0;font-size:13px}
+th,td{padding:4px 6px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;text-align:right}
+th{background:var(--surface2);color:var(--ink2);font-weight:600;text-align:center;position:sticky;top:0;z-index:2;font-size:12px;white-space:pre-line;vertical-align:bottom}
+td.l,th.l{text-align:left} td.c{text-align:center}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* entry grid */
+#grid{min-width:max-content}
+#grid td{padding:0;height:30px} #grid td.calc{background:var(--calc);padding:0 8px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+#grid input,#grid select{width:100%;height:30px;border:0;background:var(--in);padding:0 6px;border-radius:0;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+#grid input[type=text],#grid select{font-family:var(--font);text-align:left}
+#grid input:focus,#grid select:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--surface)}
+#grid input::-webkit-outer-spin-button,#grid input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0} #grid input[type=number]{-moz-appearance:textfield;appearance:textfield}
+#grid .stk{position:sticky;z-index:1;background:var(--surface)} #grid thead .stk{z-index:3;background:var(--surface2)}
+#grid .k0{left:0;min-width:34px;text-align:center;color:var(--ink2)} #grid .k1{left:34px;min-width:58px} #grid .k2{left:92px;min-width:150px;box-shadow:2px 0 0 var(--line)}
+#grid tr.s-D .k0{box-shadow:inset 4px 0 0 var(--day)} #grid tr.s-N .k0{box-shadow:inset 4px 0 0 var(--night)}
+#grid .cc{width:58px;min-width:58px} #grid .cw{width:90px;min-width:90px} #grid .cm{width:200px;min-width:200px}
+.good{color:var(--good);font-weight:600} .bad{color:var(--bad);font-weight:600}
+td.gd{background:var(--good-bg)} td.bd{background:var(--bad-bg)}
+tfoot td{position:sticky;bottom:0;background:var(--surface2);font-weight:600;z-index:2}
+.x{border:0;background:transparent;color:var(--ink2);cursor:pointer;padding:0 8px;height:30px} .x:hover{color:var(--bad)}
+.hint{font-size:12px;color:var(--ink2);margin:8px 0 0}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin:0 0 10px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:baseline}
+/* reports */
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px} @media(max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.tile b{display:block;font-size:22px;font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums} .tile span{font-size:12px;color:var(--ink2)}
+.wk td.cell{min-width:66px;text-align:center;line-height:1.25;padding:3px 4px} .wk td.cell small{display:block;font-size:11px}
+.wk td.cell.gd small{color:var(--good)} .wk td.cell.bd small{color:var(--bad)} .wk th.dn{background:var(--surface2)} .wk th.nn{color:var(--night)} .wk th.dd{color:var(--day)}
+.hb{display:grid;grid-template-columns:minmax(110px,170px) minmax(0,1fr) 64px;gap:6px 10px;align-items:center;font-size:13px}
+.track{position:relative;height:18px;background:var(--surface2);border-radius:3px} .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.track i.gd{background:var(--good)} .track i.bd{background:var(--bad)} .track u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.7}
+.par{display:grid;grid-template-columns:24px minmax(120px,240px) minmax(0,1fr) 70px 56px;gap:6px 10px;align-items:center;font-size:13px}
+.par .track i{background:var(--accent)} .par .cut{grid-column:1/-1;border-top:2px dashed var(--bad);font-size:11px;color:var(--bad);padding-top:1px;line-height:1.2}
+.heat td{text-align:center;min-width:42px;font-family:var(--mono);font-size:12px}
+.empty{border:1px dashed var(--line);border-radius:8px;padding:28px;text-align:center;color:var(--ink2);background:var(--surface)} .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px}
+.banner{border-radius:8px;padding:10px 14px;margin-bottom:12px;background:var(--warn-bg);color:var(--warn);font-weight:500}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;z-index:40;max-width:90vw}
+.mtbl input,.mtbl select{border:1px solid var(--line);background:var(--in);padding:3px 6px;border-radius:4px;width:100%;font-size:13px} .mtbl td{padding:3px}
+.set{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;max-width:900px}
+.sec{margin:26px 0 8px;font-size:14px;font-weight:700;color:var(--ink)}
+@media(max-width:600px){#grid .k2{min-width:112px} #grid .k1{min-width:52px} #grid select{padding:0 2px;font-size:12px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>Uptime Master<small>โรงงาน F3 · กรอกครั้งเดียว ดึงใช้ทุกรายงาน</small></h1>
+    <span class="chip" id="sync"><i></i><span id="synct">กำลังเชื่อมต่อ…</span></span>
+  </div>
+  <nav id="nav" aria-label="เมนู"></nav>
+</header>
+<main id="view"></main>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script>
+(function(){
+'use strict';
+/* ---------- constants ---------- */
+const TYPES=['Press','Welding','Multi-HYD','S-HYD','CNC','MCT','ETC'];
+const CAUSES=[
+ ['เปลี่ยนรุ่น','품목변경','Model change'],['ปรับเครื่อง','조정','Machine adjustment'],['เปลี่ยนแม่พิมพ์ที่เสียหาย','금형 파손 교환','Broken die replacement'],
+ ['ซ่อมแม่พิมพ์','금형수리','Die repair'],['เปลี่ยนวัตถุดิบ','원재료 교환','Raw material change'],['รอแม่พิมพ์','금형 대기','Waiting for die'],
+ ['รอวัตถุดิบ','원소재 대기','Waiting for material'],['รอพนักงาน','인원 대기','Waiting for operator'],['รอการตรวจสอบ','검사 대기','Waiting for inspection'],
+ ['เครื่องจักรเสีย','설비고장','Machine breakdown'],['สลับกะการทำงาน','공회전','Shift change / idle'],['ถ่ายน้ำมันเครื่อง','오일 교환','Oil change'],
+ ['ทำความสะอาดเครื่องจักร','기계 청소 필요 시','Machine cleaning'],['หยุดทำความสะอาด (5ส)','청소(정지시)','Cleaning stop (5S)'],['ของเสีย','불량','Defect / scrap'],['อื่น ๆ','기타','Other']];
+const TABS=[['entry','กรอกข้อมูล'],['weekly','Uptime รายสัปดาห์'],['summary','สรุปผล'],['downtime','สาเหตุหยุด'],['machines','เครื่อง'],['settings','ตั้งค่า']];
+const DOW=['อา','จ','อ','พ','พฤ','ศ','ส'];
+const DEF={month:'2026-11',target:0.75,op:10.5,eff:0.7,base:'std',weeks:[[1,3],[4,10],[11,17],[18,24],[25,30]]};
+
+/* ---------- state ---------- */
+const S={set:JSON.parse(JSON.stringify(DEF)),machines:{},days:{},remote:new Set(),ready:{m:false,d:false,s:false},db:null,ver:0,pending:0,fail:null,offline:false};
+let cache=null;
+const E={date:null,shift:'',drafts:new Map(),pref:'D'};
+const R={wkStart:null,basis:'time',showAll:false,dtLine:'',dtFrom:'',dtTo:''};
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+function h(tag,a,...kids){const e=document.createElement(tag);
+  if(a)for(const[k,v]of Object.entries(a)){if(v==null||v===false)continue;
+    if(k==='class')e.className=v;else if(k==='style')e.style.cssText=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);
+    else if(k==='value')e.value=v;else if(k==='dataset')Object.assign(e.dataset,v);else e.setAttribute(k,v===true?'':v);}
+  for(const k of kids.flat()){if(k==null||k===false)continue;e.append(k.nodeType?k:document.createTextNode(String(k)));}return e;}
+const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
+const f0=n=>Math.round(n).toLocaleString('en-US');
+const f1=n=>n.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});
+const pct=(v,d)=>v==null?'–':(v*100).toFixed(d==null?1:d)+'%';
+const addDays=(s,n)=>{const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+const dow=s=>new Date(s+'T00:00:00Z').getUTCDay();
+const monday=s=>addDays(s,-((dow(s)+6)%7));
+const dmy=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
+const dm=s=>s.slice(8,10)+'/'+s.slice(5,7);
+const mEnd=ym=>{const[y,m]=ym.split('-').map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate();};
+const todayIso=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const newId=()=>'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const clsUp=v=>v==null?'':(v>=S.set.target?'gd':'bd');
+let toastT;function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>e.hidden=true,3500);}
+function machList(){return Object.entries(S.machines).map(([id,m])=>({id,...m})).sort((a,b)=>(num(a.ord)||1e6)-(num(b.ord)||1e6)||a.id.localeCompare(b.id));}
+const mLabel=m=>m.id+(m.name?' · '+m.name:'');
+
+/* ---------- calculation (same formulas as the Excel master) ---------- */
+function calc(r,m){
+  let dt=0;const c=r.c||[];for(let i=0;i<16;i++)dt+=num(c[i]);
+  const std=num(r.std),inp=num(r.inp),ng=num(r.ng),ok=inp-ng,work=std-dt;
+  const ct=num(r.ct)>0?num(r.ct):num(m&&m.ct),load=num(m&&m.load),eff=(m&&num(m.eff)>0)?num(m.eff):S.set.eff;
+  const wh=num(r.wh)>0?num(r.wh):std/60;
+  const capa=ct>0?wh*3600*eff/(ct+load):0,t100=ct>0?S.set.op*3600/ct:0;
+  /* Uptime = actual running time after losses / base time (standard time of the row, or the fixed operating hours) */
+  const base=S.set.base==='op'?S.set.op*60:std;
+  return{dt,work,ok,ng,ct,wh,capa,t100,base,upW:base>0?work/base:null,upC:capa>0?ok/capa:null,ngp:(ok+ng)>0?ng/(ok+ng):null,active:inp>0||dt>0};
+}
+function all(){
+  if(cache&&cache.v===S.ver)return cache.rows;
+  const rows=[];
+  for(const[date,d]of Object.entries(S.days))for(const[rid,r]of Object.entries(d.rows||{})){
+    const m=S.machines[r.m];rows.push({date,rid,r,m,k:calc(r,m),line:m?m.line:'?',type:m?m.type:'?'});}
+  cache={v:S.ver,rows};return rows;
+}
+const live=()=>all().filter(x=>x.k.active);
+
+/* ---------- storage ---------- */
+const queues=new Map();
+function setSync(){const c=$('#sync'),t=$('#synct');c.className='chip'+(S.fail?' err':S.pending?' busy':'');
+  t.textContent=S.offline?'ไม่ได้เชื่อมต่อ':S.fail?S.fail:S.pending?'กำลังบันทึก…':(S.ready.m&&S.ready.d)?'บันทึกแล้ว · ซิงก์สด':'กำลังโหลด…';}
+function failMsg(e){const c=e&&e.code;
+  if(c==='invalid_argument')return'บัญชีนี้แก้ข้อมูลไม่ได้ (ต้องเป็น Contributor ขึ้นไป)';
+  if(c==='quota_exceeded')return'พื้นที่เก็บข้อมูลเต็ม';return'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง';}
+function enqueue(key,fn){
+  S.pending++;setSync();
+  const p=(queues.get(key)||Promise.resolve()).then(fn).then(()=>{S.fail=null;},e=>{S.fail=failMsg(e);toast(S.fail);}).then(()=>{S.pending--;setSync();});
+  queues.set(key,p);}
+function saveRows(date,rowsObj){
+  const d=S.days[date]||(S.days[date]={rows:{}});Object.assign(d.rows,rowsObj);S.ver++;
+  enqueue('days/'+date,async()=>{const ref=S.db.doc('days/'+date);
+    if(S.remote.has(date))await ref.update({rows:rowsObj});else{await ref.set({rows:{...S.days[date].rows}});S.remote.add(date);}});}
+function deleteRow(date,rid){
+  const d=S.days[date];if(!d)return;delete d.rows[rid];S.ver++;
+  enqueue('days/'+date,async()=>{await S.db.doc('days/'+date).set({rows:{...S.days[date].rows}});S.remote.add(date);});}
+function saveMachine(id,obj){S.machines[id]=obj;S.ver++;enqueue('machines/'+id,()=>S.db.doc('machines/'+id).set(obj));}
+function deleteMachine(id){delete S.machines[id];S.ver++;enqueue('machines/'+id,()=>S.db.doc('machines/'+id).delete());}
+function saveSettings(){S.ver++;enqueue('settings/main',()=>S.db.doc('settings/main').set(S.set));}
+
+let pendingRender=false;
+function editing(){const a=document.activeElement;return a&&a.closest&&a.closest('#view')&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);}
+function schedule(){if(editing()){pendingRender=true;return;}pendingRender=false;requestAnimationFrame(render);}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(pendingRender&&!editing()){pendingRender=false;render();}},60));
+
+async function init(){
+  const timer=setTimeout(()=>{if(!(S.ready.m&&S.ready.d)){S.fail='ยังเชื่อมต่อไม่ได้';setSync();}},10000);
+  try{S.db=window.claude?await window.claude.use('db'):null;}catch(e){S.db=null;}
+  if(!S.db){S.offline=true;setSync();render();return;}
+  const err=e=>{S.fail=failMsg(e);setSync();};
+  S.db.collection('machines').onSnapshot(s=>{S.machines={};s.docs.forEach(d=>S.machines[d.id]=d.data());S.ready.m=true;S.ver++;setSync();schedule();},err);
+  S.db.collection('days').onSnapshot(s=>{S.days={};S.remote=new Set();s.docs.forEach(d=>{S.days[d.id]={rows:{...((d.data()||{}).rows||{})}};S.remote.add(d.id);});S.ready.d=true;S.ver++;
+    if(!E.date){const ks=Object.keys(S.days).sort();E.date=ks.length?ks[ks.length-1]:todayIso();}clearTimeout(timer);S.fail=null;setSync();schedule();},err);
+  S.db.doc('settings/main').onSnapshot(s=>{if(s.exists)S.set={...DEF,...s.data()};S.ready.s=true;S.ver++;schedule();},err);
+}
+
+/* ---------- routing ---------- */
+function tab(){const t=location.hash.slice(1);return TABS.some(x=>x[0]===t)?t:'entry';}
+function render(){
+  const t=tab();
+  $('#nav').replaceChildren(...TABS.map(([k,l])=>h('a',{href:'#'+k,'aria-current':k===t?'page':null},l)));
+  const root=$('#view');root.replaceChildren();
+  if(S.offline)root.append(h('div',{class:'banner'},'เชื่อมต่อฐานข้อมูลไม่ได้ เปิดหน้านี้ผ่าน claude.ai แล้วเข้าสู่ระบบ ข้อมูลจึงจะบันทึกและแสดงได้'));
+  if(!S.offline&&!(S.ready.m&&S.ready.d)){root.append(h('div',{class:'empty'},h('b','กำลังโหลดข้อมูล…'),'รอสักครู่ ระบบกำลังดึงข้อมูลที่บันทึกไว้'));return;}
+  ({entry:vEntry,weekly:vWeekly,summary:vSummary,downtime:vDowntime,machines:vMachines,settings:vSettings})[t](root);
+}
+window.addEventListener('hashchange',()=>{pendingRender=false;render();window.scrollTo(0,0);});
+
+/* ---------- ENTRY ---------- */
+const ENT_FIELDS=['s','m','it','std'];
+function dayRows(date){
+  const out=[];const d=S.days[date];
+  if(d)for(const[rid,r]of Object.entries(d.rows||{}))out.push({rid,r,draft:false});
+  for(const[rid,r]of E.drafts)out.push({rid,r,draft:true});
+  const ord={};machList().forEach((m,i)=>ord[m.id]=i);
+  out.sort((a,b)=>(a.draft-b.draft)||((ord[a.r.m]??9999)-(ord[b.r.m]??9999))||(a.r.s===b.r.s?0:a.r.s==='D'?-1:1)||a.rid.localeCompare(b.rid));
+  return E.shift?out.filter(x=>x.r.s===E.shift):out;
+}
+function readRow(tr){const g=f=>tr.querySelector('[data-f="'+f+'"]');
+  return{s:g('s').value,m:g('m').value,it:g('it').value.trim(),std:num(g('std').value),c:CAUSES.map((_,i)=>num(g('c'+i).value)),
+    inp:num(g('inp').value),ng:num(g('ng').value),wh:num(g('wh').value),ct:num(g('ct').value),note:g('note').value.trim()};}
+function setK(tr,k,v,cls){const e=tr.querySelector('[data-k="'+k+'"]');if(!e)return;e.textContent=v;if(cls!=null)e.className='calc '+cls;}
+function updateCalc(tr){
+  const row=readRow(tr),k=calc(row,S.machines[row.m]);
+  const cl=v=>k.active&&v!=null?(v>=S.set.target?'good':'bad'):'';
+  setK(tr,'dt',k.dt?f0(k.dt):'');setK(tr,'work',row.std?f0(k.work):'',k.work<0?'bad':'');setK(tr,'ok',row.inp||row.ng?f0(k.ok):'');
+  setK(tr,'capa',k.capa?f0(k.capa):'');setK(tr,'t100',k.t100?f0(k.t100):'');
+  setK(tr,'upW',k.upW==null||!k.active?'':pct(k.upW),cl(k.upW));
+  setK(tr,'upC',k.upC==null||!k.active?'':pct(k.upC));
+  setK(tr,'ngp',k.ngp==null||!k.active?'':pct(k.ngp));
+  tr._k=k;tr._row=row;
+}
+function updateFoot(){
+  const trs=[...document.querySelectorAll('#grid tbody tr')];let dt=0,work=0,base=0,inp=0,ng=0,ok=0,capa=0,t100=0,n=0,cs=Array(16).fill(0);
+  for(const tr of trs){const k=tr._k,r=tr._row;if(!k||!k.active)continue;n++;dt+=k.dt;work+=k.work;base+=k.base;ok+=k.ok;ng+=k.ng;capa+=k.capa;t100+=k.t100;inp+=num(r.inp);r.c.forEach((v,i)=>cs[i]+=num(v));}
+  const set=(k,v)=>{const e=document.querySelector('[data-t="'+k+'"]');if(e)e.textContent=v;};
+  cs.forEach((v,i)=>set('c'+i,v?f0(v):''));set('dt',f0(dt));set('work',f0(work));set('inp',f0(inp));set('ng',f0(ng));set('ok',f0(ok));set('capa',f0(capa));set('t100',f0(t100));
+  set('upW',base?pct(work/base):'');set('upC',capa?pct(ok/capa):'');set('ngp',ok+ng?pct(ng/(ok+ng)):'');set('n',n+' แถว');
+}
+function numIn(f,val,extra){return h('input',{type:'number','data-f':f,value:val?String(val):'',min:'0',step:'any',inputmode:'decimal','aria-label':f,...extra});}
+function gridRow(rid,r,idx){
+  const tr=h('tr',{class:'s-'+(r.s||'D')});tr._rid=rid;
+  const mopts=[h('option',{value:''},'— เลือกเครื่อง —'),...machList().map(m=>h('option',{value:m.id},mLabel(m)))];
+  if(r.m&&!S.machines[r.m])mopts.push(h('option',{value:r.m},r.m+' (ไม่พบในทะเบียน)'));
+  const sel=h('select',{'data-f':'m','aria-label':'เครื่อง'},mopts);sel.value=r.m||'';
+  const sh=h('select',{'data-f':'s','aria-label':'กะ'},h('option',{value:'D'},'D เช้า'),h('option',{value:'N'},'N ดึก'));sh.value=r.s||'D';
+  const cell=(k,cls)=>h('td',{class:'calc '+(cls||''),'data-k':k});
+  tr.append(h('td',{class:'stk k0'},String(idx)),h('td',{class:'stk k1'},sh),h('td',{class:'stk k2'},sel),
+    h('td',{class:'cm'},h('input',{type:'text','data-f':'it',value:r.it||'','aria-label':'ชิ้นงาน'})),
+    h('td',{class:'cc'},numIn('std',r.std)),
+    ...CAUSES.map((_,i)=>h('td',{class:'cc'},numIn('c'+i,(r.c||[])[i],{title:CAUSES[i][0]+' / '+CAUSES[i][2]}))),
+    cell('dt'),cell('work'),h('td',{class:'cw'},numIn('inp',r.inp)),h('td',{class:'cc'},numIn('ng',r.ng)),cell('ok'),
+    h('td',{class:'cc'},numIn('wh',r.wh,{title:'ชั่วโมงเดินเครื่องตามแผน เว้นว่าง = เวลามาตรฐาน÷60'})),h('td',{class:'cc'},numIn('ct',r.ct,{title:'CT ระบุเอง (วินาที) เว้นว่าง = ใช้ของเครื่อง'})),
+    h('td',{class:'cm'},h('input',{type:'text','data-f':'note',value:r.note||'','aria-label':'หมายเหตุ'})),
+    cell('capa'),cell('t100'),cell('upW'),cell('upC'),cell('ngp'),
+    h('td',{class:'c'},h('button',{class:'x',type:'button','data-x':'1',title:'ลบแถว','aria-label':'ลบแถว'},'✕')));
+  updateCalc(tr);return tr;
+}
+function fillBody(){
+  const tb=$('#grid tbody');const rows=dayRows(E.date);
+  tb.replaceChildren(...rows.map((x,i)=>gridRow(x.rid,x.r,i+1)));
+  $('#emptyDay').hidden=rows.length>0;updateFoot();
+}
+function vEntry(root){
+  if(!E.date)E.date=todayIso();
+  const mc=machList().length;
+  root.append(h('h2',null,'กรอกข้อมูลรายวัน'),h('p',{class:'sub'},'1 แถว = 1 กะ × 1 เครื่อง × 1 ชิ้นงาน ช่องสีเหลืองคือช่องกรอก ช่องสีเทาคำนวณเอง บันทึกอัตโนมัติเมื่อออกจากช่อง ทุกรายงานดึงจากข้อมูลชุดนี้'));
+  if(S.ready.m&&!mc){root.append(h('div',{class:'empty'},h('b','ยังไม่มีเครื่องในทะเบียน'),'ไปที่แท็บ ',h('a',{href:'#machines'},'เครื่อง'),' เพื่อเพิ่มเครื่อง แล้วกลับมากรอกข้อมูล'));return;}
+  const dIn=h('input',{type:'date',id:'edate',value:E.date,onchange:e=>{if(e.target.value){E.date=e.target.value;E.drafts.clear();render();}}});
+  const go=n=>()=>{E.date=addDays(E.date,n);E.drafts.clear();render();};
+  const sh=(v,l)=>h('button',{type:'button','aria-pressed':String(E.shift===v),onclick:()=>{E.shift=v;render();}},l);
+  root.append(h('div',{class:'bar'},
+    h('div',{class:'seg'},h('button',{type:'button',onclick:go(-1),'aria-label':'วันก่อนหน้า'},'◀'),h('button',{type:'button',onclick:()=>{E.date=todayIso();render();}},'วันนี้'),h('button',{type:'button',onclick:go(1),'aria-label':'วันถัดไป'},'▶')),
+    h('label',{class:'fld',for:'edate'},'วันที่',dIn),
+    h('div',{class:'seg',role:'group','aria-label':'กรองกะ'},sh('','ทั้งสองกะ'),sh('D','เช้า'),sh('N','ดึก')),
+    h('span',{class:'grow'}),
+    h('button',{class:'btn',type:'button',onclick:scaffold,title:'สร้างแถวว่างของทุกเครื่อง ทั้งกะเช้าและกะดึก'},'สร้างแถวทุกเครื่อง'),
+    h('button',{class:'btn pri',type:'button',onclick:addRow},'+ เพิ่มแถว'),
+    h('button',{class:'btn',type:'button',onclick:exportXlsx,title:'ดาวน์โหลดเป็นไฟล์ Excel ที่มีสูตร: ชีตกรอกข้อมูลเพิ่มคอลัมน์/แถวได้ ชีตอื่นคำนวณตาม'},'ดาวน์โหลด Excel'),
+    h('button',{class:'btn',type:'button',onclick:exportSql,title:'ส่งออกฐานข้อมูล SQL (โครงสร้างตาราง ข้อมูล และ view รายงาน)'},'ส่งออก SQL')));
+  const head=[h('th',{class:'stk k0'},'#'),h('th',{class:'stk k1'},'กะ'),h('th',{class:'stk k2'},'เครื่อง'),h('th',{class:'cm'},'ชิ้นงาน'),h('th',{class:'cc'},'เวลา\nมาตรฐาน\n(นาที)'),
+    ...CAUSES.map((c,i)=>h('th',{class:'cc',title:c[0]+' / '+c[1]+' / '+c[2]},(i+1)+'. '+c[0])),
+    h('th',null,'หยุดรวม\n(นาที)'),h('th',null,'ทำงาน\n(นาที)'),h('th',{class:'cw'},'ผลิตทั้งหมด'),h('th',null,'NG'),h('th',null,'OK'),h('th',null,'Working\nHours (ชม.)'),h('th',null,'CT เอง\n(วินาที)'),h('th',{class:'cm'},'หมายเหตุ / LOT'),
+    h('th',null,'CAPA'),h('th',null,'Target\n100%'),h('th',null,'%Uptime\n(เวลาจริง)'),h('th',null,'%Output\n(OK÷CAPA)'),h('th',null,'%NG'),h('th',null,'')];
+  const foot=h('tr',null,h('td',{class:'stk k0'},''),h('td',{class:'stk k1'},''),h('td',{class:'stk k2','data-t':'n'},''),h('td',null,'รวมวันนี้'),h('td',null,''),
+    ...CAUSES.map((_,i)=>h('td',{'data-t':'c'+i,class:'num'})),...['dt','work','inp','ng','ok'].map(k=>h('td',{'data-t':k,class:'num'})),h('td'),h('td'),h('td'),
+    ...['capa','t100','upW','upC','ngp'].map(k=>h('td',{'data-t':k,class:'num'})),h('td'));
+  const grid=h('table',{id:'grid'},h('thead',null,h('tr',null,head)),h('tbody'),h('tfoot',null,foot));
+  const tb=grid.querySelector('tbody');
+  tb.addEventListener('input',e=>{const tr=e.target.closest('tr');if(tr){updateCalc(tr);updateFoot();}});
+  tb.addEventListener('change',e=>{const tr=e.target.closest('tr');if(!tr)return;
+    if(e.target.dataset.f==='m'){const s=tr.querySelector('[data-f="std"]');if(e.target.value&&!num(s.value))s.value=String(S.set.op*60);}
+    const row=readRow(tr);updateCalc(tr);updateFoot();tr.className='s-'+row.s;E.pref=row.s;
+    if(!row.m){E.drafts.set(tr._rid,row);return;}
+    E.drafts.delete(tr._rid);saveRows(E.date,{[tr._rid]:row});});
+  tb.addEventListener('click',e=>{const b=e.target.closest('[data-x]');if(!b)return;const tr=b.closest('tr');
+    if(b.dataset.armed){const rid=tr._rid;if(E.drafts.has(rid))E.drafts.delete(rid);else deleteRow(E.date,rid);fillBody();return;}
+    b.dataset.armed='1';b.textContent='ลบ?';b.style.color='var(--bad)';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='✕';b.style.color='';}},3000);});
+  root.append(h('div',{class:'scroll',style:'max-height:68vh'},grid),
+    h('div',{id:'emptyDay',class:'empty',hidden:true,style:'margin-top:12px'},h('b','วันที่ '+dmy(E.date)+' ยังไม่มีข้อมูล'),'กด “+ เพิ่มแถว” หรือ “สร้างแถวทุกเครื่อง” เพื่อเริ่มกรอก'),
+    h('p',{class:'hint'},'%Uptime = (เวลามาตรฐาน − เวลาสูญเสียรวม) ÷ ฐานเวลา เทียบเป้า '+pct(S.set.target,0)+' · เวลาสูญเสียรวม = ผลรวม 16 สาเหตุ (นาที) · OK = ผลิตทั้งหมด − NG · CAPA = Working Hours × 3600 × Efficiency ÷ (CT + Loading) · %Output = OK ÷ CAPA'));
+  fillBody();
+}
+function addRow(){
+  const rid=newId();E.drafts.set(rid,{s:E.pref||'D',m:'',it:'',std:S.set.op*60,c:Array(16).fill(0),inp:0,ng:0,wh:0,ct:0,note:''});
+  fillBody();const tr=[...document.querySelectorAll('#grid tbody tr')].find(t=>t._rid===rid);if(tr){tr.scrollIntoView({block:'nearest'});tr.querySelector('[data-f="m"]').focus();}
+}
+function scaffold(){
+  const have=new Set(dayRows(E.date).map(x=>x.r.m+'|'+x.r.s));const add={};
+  for(const m of machList())for(const s of['D','N']){if(E.shift&&E.shift!==s)continue;if(have.has(m.id+'|'+s))continue;
+    add[newId()]={s,m:m.id,it:'',std:S.set.op*60,c:Array(16).fill(0),inp:0,ng:0,wh:0,ct:0,note:''};}
+  const n=Object.keys(add).length;if(!n){toast('ทุกเครื่องมีแถวของวันนี้แล้ว');return;}
+  saveRows(E.date,add);fillBody();toast('สร้าง '+n+' แถวใหม่');
+}
+async function exportCsv(){
+  const dl=window.claude?await window.claude.use('downloads'):null;
+  if(!dl){toast('ส่งออกไฟล์ไม่ได้ในมุมมองนี้');return;}
+  const q=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const head=['วันที่','กะ','เครื่อง','Line','Type','ชิ้นงาน','เวลามาตรฐาน','หยุดรวม','เวลาทำงาน','ผลิตทั้งหมด','NG','OK','Working Hours','CT','CAPA','Target100','Output(CAPA)','Uptime(เวลาจริง)','NG%','หมายเหตุ',...CAUSES.map((c,i)=>(i+1)+'.'+c[0])];
+  const lines=[head.map(q).join(',')];
+  all().filter(x=>x.k.active).sort((a,b)=>a.date.localeCompare(b.date)||a.r.m.localeCompare(b.r.m)||a.r.s.localeCompare(b.r.s)).forEach(x=>{const r=x.r,k=x.k;
+    lines.push([x.date,r.s,r.m,x.line,x.type,r.it,num(r.std),k.dt,k.work,num(r.inp),k.ng,k.ok,k.wh.toFixed(2),k.ct,k.capa.toFixed(1),k.t100.toFixed(1),k.upC==null?'':k.upC.toFixed(4),k.upW==null?'':k.upW.toFixed(4),k.ngp==null?'':k.ngp.toFixed(4),r.note,...(r.c||[]).map(num)].map(q).join(','));});
+  if(lines.length<2){toast('ยังไม่มีข้อมูลให้ส่งออก');return;}
+  try{await dl.save({filename:'uptime-entries-'+S.set.month+'.csv',data:'﻿'+lines.join('\n')});}catch(e){if(!e||e.code!=='declined')toast('ส่งออกไม่สำเร็จ');}
+}
+
+/* ---------- SQL export ---------- */
+const SQL_DDL=`-- Uptime Master: SQL schema (ANSI-style; runs on PostgreSQL, SQLite, MySQL 8, SQL Server with minor type changes)
+CREATE TABLE machine (
+  machine_id         VARCHAR(60)  PRIMARY KEY,
+  line               VARCHAR(10),
+  machine_type       VARCHAR(20),
+  plant              VARCHAR(10),
+  machine_name       VARCHAR(120),
+  ct_sec             NUMERIC(8,2),
+  loading_sec        NUMERIC(8,2) DEFAULT 0,
+  efficiency         NUMERIC(5,4),
+  alias_downtime     VARCHAR(120),
+  alias_uptime_show  VARCHAR(120),
+  alias_productivity VARCHAR(120),
+  note               VARCHAR(255),
+  sort_no            INTEGER
+);
+CREATE TABLE downtime_cause (
+  cause_id INTEGER PRIMARY KEY,
+  name_th  VARCHAR(80),
+  name_ko  VARCHAR(80),
+  name_en  VARCHAR(80)
+);
+CREATE TABLE setting (
+  setting_key   VARCHAR(40) PRIMARY KEY,
+  setting_value VARCHAR(40)
+);
+CREATE TABLE week_def (
+  month_start DATE    NOT NULL,
+  week_no     INTEGER NOT NULL,
+  date_from   DATE    NOT NULL,
+  date_to     DATE    NOT NULL,
+  PRIMARY KEY (month_start, week_no)
+);
+CREATE TABLE production_log (
+  log_id          VARCHAR(40) PRIMARY KEY,
+  work_date       DATE        NOT NULL,
+  shift           CHAR(1)     NOT NULL CHECK (shift IN ('D','N')),
+  machine_id      VARCHAR(60) NOT NULL REFERENCES machine (machine_id),
+  item            VARCHAR(255),
+  std_minutes     NUMERIC(8,2) NOT NULL,
+  input_qty       INTEGER NOT NULL DEFAULT 0,
+  ng_qty          INTEGER NOT NULL DEFAULT 0,
+  working_hours   NUMERIC(6,2),
+  ct_override_sec NUMERIC(8,2),
+  note            VARCHAR(255)
+);
+CREATE TABLE downtime_log (
+  log_id   VARCHAR(40) NOT NULL REFERENCES production_log (log_id),
+  cause_id INTEGER     NOT NULL REFERENCES downtime_cause (cause_id),
+  minutes  NUMERIC(8,2) NOT NULL,
+  PRIMARY KEY (log_id, cause_id)
+);
+CREATE INDEX ix_production_date    ON production_log (work_date, machine_id);
+CREATE INDEX ix_downtime_cause     ON downtime_log (cause_id);
+`;
+const SQL_VIEWS=`
+-- Total loss minutes per log row
+CREATE VIEW v_log_loss AS
+SELECT p.log_id, COALESCE(SUM(d.minutes), 0) AS downtime_min
+FROM production_log p LEFT JOIN downtime_log d ON d.log_id = p.log_id
+GROUP BY p.log_id;
+
+-- One row per log with every calculated field (same formulas as the web page and the Excel file)
+CREATE VIEW v_production AS
+SELECT p.log_id, p.work_date, p.shift, p.machine_id, m.machine_name, m.line, m.machine_type, m.plant, p.item,
+       p.std_minutes,
+       l.downtime_min,
+       p.std_minutes - l.downtime_min                       AS work_min,
+       p.input_qty, p.ng_qty,
+       p.input_qty - p.ng_qty                               AS ok_qty,
+       CASE WHEN COALESCE(p.ct_override_sec, 0) > 0 THEN p.ct_override_sec ELSE COALESCE(m.ct_sec, 0) END AS ct_used_sec,
+       CASE WHEN (SELECT setting_value FROM setting WHERE setting_key = 'base') = 'op'
+            THEN CAST((SELECT setting_value FROM setting WHERE setting_key = 'op_hours') AS NUMERIC) * 60
+            ELSE p.std_minutes END                          AS base_min,
+       CASE WHEN COALESCE(p.working_hours, 0) > 0 THEN p.working_hours ELSE p.std_minutes / 60.0 END AS working_hours_used,
+       CASE WHEN COALESCE(m.efficiency, 0) > 0 THEN m.efficiency
+            ELSE CAST((SELECT setting_value FROM setting WHERE setting_key = 'efficiency') AS NUMERIC) END AS efficiency_used,
+       COALESCE(m.loading_sec, 0)                           AS loading_sec,
+       CASE WHEN p.input_qty > 0 OR l.downtime_min > 0 THEN 1 ELSE 0 END AS active_flag
+FROM production_log p
+JOIN machine m  ON m.machine_id = p.machine_id
+JOIN v_log_loss l ON l.log_id = p.log_id;
+
+CREATE VIEW v_production_calc AS
+SELECT v.*,
+       CASE WHEN v.ct_used_sec > 0 THEN v.working_hours_used * 3600 * v.efficiency_used / (v.ct_used_sec + v.loading_sec) ELSE 0 END AS capa_qty,
+       CASE WHEN v.base_min > 0 THEN 1.0 * v.work_min / v.base_min END AS uptime_time
+FROM v_production v;
+
+-- Daily uptime per machine and shift (time-based Uptime, 75% target)
+CREATE VIEW v_uptime_daily AS
+SELECT work_date, shift, machine_id, machine_name, machine_type,
+       SUM(ok_qty) AS ok_qty, SUM(work_min) AS work_min, SUM(base_min) AS base_min,
+       1.0 * SUM(work_min) / NULLIF(SUM(base_min), 0) AS uptime
+FROM v_production_calc WHERE active_flag = 1
+GROUP BY work_date, shift, machine_id, machine_name, machine_type;
+
+-- Uptime per week (W1..W5 from week_def) per machine
+CREATE VIEW v_uptime_week_machine AS
+SELECT w.month_start, w.week_no, v.machine_id, v.machine_type,
+       SUM(v.ok_qty) AS ok_qty, SUM(v.capa_qty) AS capa_qty,
+       SUM(v.work_min) AS work_min, SUM(v.base_min) AS base_min,
+       1.0 * SUM(v.work_min) / NULLIF(SUM(v.base_min), 0) AS uptime,
+       1.0 * SUM(v.ok_qty) / NULLIF(SUM(v.capa_qty), 0) AS output_ratio
+FROM v_production_calc v JOIN week_def w ON v.work_date BETWEEN w.date_from AND w.date_to
+WHERE v.active_flag = 1
+GROUP BY w.month_start, w.week_no, v.machine_id, v.machine_type;
+
+-- Uptime per week per machine type (summary table)
+CREATE VIEW v_uptime_week_type AS
+SELECT w.month_start, w.week_no, v.machine_type,
+       SUM(v.ok_qty) AS ok_qty, SUM(v.capa_qty) AS capa_qty,
+       SUM(v.work_min) AS work_min, SUM(v.base_min) AS base_min,
+       1.0 * SUM(v.work_min) / NULLIF(SUM(v.base_min), 0) AS uptime,
+       1.0 * SUM(v.ok_qty) / NULLIF(SUM(v.capa_qty), 0) AS output_ratio
+FROM v_production_calc v JOIN week_def w ON v.work_date BETWEEN w.date_from AND w.date_to
+WHERE v.active_flag = 1
+GROUP BY w.month_start, w.week_no, v.machine_type;
+
+-- Downtime Pareto (add WHERE on work_date to limit the period; join production_log for the date)
+CREATE VIEW v_downtime_pareto AS
+SELECT c.cause_id, c.name_th, c.name_en,
+       COALESCE(SUM(d.minutes), 0) AS minutes,
+       COALESCE(SUM(d.minutes), 0) / 60.0 AS hours
+FROM downtime_cause c LEFT JOIN downtime_log d ON d.cause_id = c.cause_id
+GROUP BY c.cause_id, c.name_th, c.name_en;
+
+CREATE VIEW v_downtime_by_machine AS
+SELECT p.machine_id, d.cause_id, SUM(d.minutes) AS minutes
+FROM downtime_log d JOIN production_log p ON p.log_id = d.log_id
+GROUP BY p.machine_id, d.cause_id;
+`;
+function sq(v){return v==null||v===''?'NULL':"'"+String(v).replace(/'/g,"''")+"'";}
+function sn(v){const n=Number(v);return Number.isFinite(n)?String(n):'NULL';}
+function buildSql(){
+  const L=['-- Uptime Master export · '+S.set.month+' · generated '+new Date().toISOString().slice(0,10),'',SQL_DDL];
+  L.push('-- ---------- reference data ----------');
+  CAUSES.forEach((c,i)=>L.push('INSERT INTO downtime_cause VALUES ('+(i+1)+', '+sq(c[0])+', '+sq(c[1])+', '+sq(c[2])+');'));
+  [['op_hours',S.set.op],['target',S.set.target],['efficiency',S.set.eff],['base',S.set.base||'std'],['month',S.set.month]].forEach(([k,v])=>L.push('INSERT INTO setting VALUES ('+sq(k)+', '+sq(v)+');'));
+  const ym=S.set.month,last=mEnd(ym);
+  S.set.weeks.forEach(([a,b],i)=>L.push('INSERT INTO week_def VALUES ('+sq(ym+'-01')+', '+(i+1)+', '+sq(ym+'-'+String(Math.min(a,last)).padStart(2,'0'))+', '+sq(ym+'-'+String(Math.min(b,last)).padStart(2,'0'))+');'));
+  machList().forEach(m=>L.push('INSERT INTO machine VALUES ('+[sq(m.id),sq(m.line),sq(m.type),sq(m.plant),sq(m.name),sn(m.ct),sn(m.load||0),num(m.eff)>0?sn(m.eff):'NULL',sq(m.aDown),sq(m.aUp),sq(m.aProd),sq(m.note),sn(m.ord||0)].join(', ')+');'));
+  L.push('','-- ---------- transactions ----------');
+  const rows=all().filter(x=>x.r.m&&S.machines[x.r.m]).sort((a,b)=>a.date.localeCompare(b.date)||a.rid.localeCompare(b.rid));
+  for(const x of rows){const r=x.r;
+    L.push('INSERT INTO production_log VALUES ('+[sq(x.rid),sq(x.date),sq(r.s),sq(r.m),sq(r.it),sn(r.std),sn(r.inp),sn(r.ng),num(r.wh)>0?sn(r.wh):'NULL',num(r.ct)>0?sn(r.ct):'NULL',sq(r.note)].join(', ')+');');}
+  for(const x of rows)(x.r.c||[]).forEach((v,i)=>{if(num(v)>0)L.push('INSERT INTO downtime_log VALUES ('+sq(x.rid)+', '+(i+1)+', '+sn(v)+');');});
+  L.push('','-- ---------- reporting views ----------',SQL_VIEWS,'-- Example: uptime of each machine in week 4','-- SELECT * FROM v_uptime_week_machine WHERE week_no = 4 ORDER BY uptime;');
+  return L.join('\n');
+}
+async function exportSql(){
+  const dl=window.claude?await window.claude.use('downloads'):null;
+  if(!dl){toast('ดาวน์โหลดไม่ได้ในมุมมองนี้');return;}
+  if(!all().some(x=>x.r.m)){toast('ยังไม่มีข้อมูลให้ส่งออก');return;}
+  try{await dl.save({filename:'uptime-master-'+S.set.month+'-sql.txt',data:buildSql()});}catch(e){if(!e||e.code!=='declined')toast('ส่งออกไม่สำเร็จ');}
+}
+
+/* ---------- Excel export (live formulas; entry sheet can be extended by the user) ---------- */
+const SH={R:'อ่านก่อน',E:'กรอกข้อมูล',M:'เครื่อง',S:'ตั้งค่า',W:'Uptime_รายสัปดาห์',U:'สรุปผล',P:'Pareto_สาเหตุหยุด',D:'รายละเอียดสาเหตุ'};
+const CL=n=>{let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+async function buildWorkbook(){
+  const X=new ExcelJS.Workbook();X.creator='Uptime Master';X.calcProperties={fullCalcOnLoad:true};
+  const FN='Tahoma',navy='FF1F3864',subF='FFD9E1F2',inpF='FFFFF6D1',calcF='FFEDF0F5',badF='FFF9D9D5',goodF='FFD9F2E5',dark='FF595959';
+  const fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
+  const ln={style:'thin',color:{argb:'FFBFBFBF'}},bd={top:ln,left:ln,bottom:ln,right:ln};
+  const sty=(c,o)=>{c.font={name:FN,size:10,bold:!!o.b,color:{argb:o.fc||'FF000000'},italic:!!o.i};if(o.f)c.fill=fill(o.f);if(o.nf)c.numFmt=o.nf;c.alignment={horizontal:o.h||undefined,vertical:'middle',wrapText:!!o.w};if(!o.nb)c.border=bd;};
+  const hd=(c,f)=>sty(c,{b:1,fc:'FFFFFFFF',f:f||navy,h:'center',w:1});
+  const put=(ws,ref,v,o)=>{const c=ws.getCell(ref);c.value=v;sty(c,o||{});return c;};
+  const date=s=>new Date(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10)));
+  const ws={};for(const k of['R','E','M','S','W','U','P','D'])ws[k]=X.addWorksheet(SH[k],{views:[{showGridLines:k==='E'||k==='M'}]});
+  const q=k=>"'"+SH[k]+"'!";
+  const mach=machList();const NM=mach.length;
+  const rowsAll=all().filter(x=>x.r.m).sort((a,b)=>a.date.localeCompare(b.date)||mach.findIndex(m=>m.id===a.r.m)-mach.findIndex(m=>m.id===b.r.m)||(a.r.s===b.r.s?0:a.r.s==='D'?-1:1)||a.rid.localeCompare(b.rid));
+  /* ---- layout constants ---- */
+  const MR0=5,MRN=304;                         /* machine sheet rows */
+  const ER0=6,ERN=5005,PF=ER0+Math.max(rowsAll.length,200)+400;   /* entry rows: data from 6, ranges to 5005, formulas pre-filled to PF */
+  const C={d:1,s:2,m:3,it:4,std:5,inp:6,ng:7,wh:8,ct:9,note:10,cs:11,c0:12,ce:28,dt:29,work:30,ok:31,line:32,type:33,week:34,ctu:35,base:36,capa:37,t100:38,upw:39,upc:40,ngp:41,act:42};
+  const ER=c=>q('E')+'$'+CL(c)+'$'+ER0+':$'+CL(c)+'$'+ERN;
+  const CAUSEBLK=q('E')+'$'+CL(C.cs)+'$'+ER0+':$'+CL(C.ce)+'$'+ERN, CAUSEHDR=q('E')+'$'+CL(C.cs)+'$5:$'+CL(C.ce)+'$5';
+  const MM=c=>q('M')+'$'+c+'$'+MR0+':$'+c+'$'+MRN;
+  /* ---- README ---- */
+  {const w=ws.R;w.getColumn(1).width=26;w.getColumn(2).width=120;
+   put(w,'A1','Uptime Master — ไฟล์ Excel (สูตรจริง ทุกชีตคำนวณตามชีตกรอกข้อมูล)',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   const L=[['ชีต','หน้าที่'],
+    [SH.E,'ที่เดียวที่กรอก (ช่องสีเหลือง) 1 แถว = วัน × กะ × เครื่อง × ชิ้นงาน เพิ่มแถวได้ไม่จำกัด (สูตรเตรียมไว้ให้ถึงแถว '+PF+' เกินนั้นให้ก๊อปสูตรลงไป)'],
+    [SH.M,'ทะเบียนเครื่อง: CT, Type, ชื่อที่ใช้ในไฟล์เดิม เพิ่มเครื่องใหม่ต่อท้ายได้ (ถึงแถว '+MRN+')'],
+    [SH.S,'เดือน, เป้า Uptime, ฐานเวลา, ชั่วโมงเดินเครื่อง, Efficiency, ช่วง W1–W5'],
+    [SH.W,'แทนไฟล์ Uptime Show (เปลี่ยนวันจันทร์ที่ C3)'],[SH.U,'แทน 생산 종합 현황: Uptime ตามประเภท/รายเครื่อง W1–W5 และทั้งเดือน'],
+    [SH.P,'Pareto สาเหตุหยุด (เลือก Line และช่วงวันที่)'],[SH.D,'รายวัน × สาเหตุ และรายเครื่อง × สาเหตุ (ชั่วโมง)'],['',''],
+    ['เพิ่มคอลัมน์/เซลล์เอง',''],
+    ['คอลัมน์ข้อมูลทั่วไป','คลิกขวาที่หัวคอลัมน์ > Insert ที่ไหนก็ได้ สูตรทุกชีตจะปรับตำแหน่งให้อัตโนมัติ'],
+    ['สาเหตุหยุดใหม่','แทรกคอลัมน์ “ระหว่าง” เครื่องหมาย ◀ (คอลัมน์ K) กับ ▶ แล้วพิมพ์ชื่อสาเหตุที่แถวหัวตาราง (แถว 5) ชีต Pareto และรายละเอียดสาเหตุจะรวมสาเหตุใหม่ให้เอง (รองรับสูงสุด 30 สาเหตุ)'],
+    ['เพิ่มแถว','พิมพ์ต่อท้ายตารางได้เลย หรือคลิกขวาที่เลขแถว > Insert ระหว่างแถวก็ได้ ช่วงที่รายงานอ่านคือแถว '+ER0+'–'+ERN],
+    ['',''],['สูตรหลัก',''],
+    ['เวลาสูญเสียรวม (นาที)','ผลรวมคอลัมน์สาเหตุทั้งหมดระหว่าง ◀ กับ ▶'],['เวลาทำงานจริง (นาที)','เวลามาตรฐาน − เวลาสูญเสียรวม'],
+    ['Uptime','เวลาทำงานจริง ÷ ฐานเวลา (ฐานเวลา = เวลามาตรฐานของแถว หรือชั่วโมงเดินเครื่อง×60 ตามที่เลือกในชีตตั้งค่า) เทียบเป้า '+Math.round(S.set.target*100)+'%'],
+    ['CAPA / Output','CAPA = Working Hours × 3600 × Efficiency ÷ (CT + Loading) ส่วน Output = ยอด OK ÷ CAPA'],
+    ['OK / %NG','OK = ผลิตทั้งหมด − NG   %NG = NG ÷ (OK + NG)'],
+    ['หมายเหตุ','ไฟล์นี้ให้ Excel คำนวณสูตรทั้งหมดตอนเปิดไฟล์ ถ้าเปิดในตัวอ่านที่ไม่คำนวณ (เช่น พรีวิวบนมือถือ) ตัวเลขอาจว่าง ให้เปิดด้วย Excel หรือ Google Sheets']];
+   L.forEach((r,i)=>{const hdr=i===0||r[0]==='เพิ่มคอลัมน์/เซลล์เอง'||r[0]==='สูตรหลัก';put(w,'A'+(3+i),r[0],{b:hdr||!!r[0],f:hdr?subF:null,nb:1,w:1});put(w,'B'+(3+i),r[1],{f:hdr?subF:null,nb:1,w:1});});}
+  /* ---- Settings ---- */
+  {const w=ws.S;w.getColumn(1).width=14;w.getColumn(2).width=44;w.getColumn(3).width=16;w.getColumn(4).width=14;w.getColumn(5).width=14;w.getColumn(6).width=14;
+   put(w,'A1','ตั้งค่า (ช่องสีเหลืองแก้ได้)',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   put(w,'B3','เดือนที่รายงาน (วันที่ 1)',{b:1});put(w,'C3',date(S.set.month+'-01'),{f:inpF,nf:'dd/mm/yyyy'});
+   put(w,'B4','Target Uptime',{b:1});put(w,'C4',S.set.target,{f:inpF,nf:'0%'});
+   put(w,'B5','ชั่วโมงเดินเครื่อง/กะ',{b:1});put(w,'C5',S.set.op,{f:inpF,nf:'0.00'});
+   put(w,'B6','Work Efficiency ตั้งต้น',{b:1});put(w,'C6',S.set.eff,{f:inpF,nf:'0%'});
+   put(w,'B7','ฐานเวลาของ Uptime (std = เวลามาตรฐานของแถว, op = ชั่วโมงเดินเครื่อง×60)',{b:1,w:1});put(w,'C7',S.set.base==='op'?'op':'std',{f:inpF});
+   w.getCell('C7').dataValidation={type:'list',allowBlank:false,formulae:['"std,op"']};
+   ['รหัส','ช่วงสัปดาห์','วันเริ่ม','วันสิ้นสุด','วันที่เริ่ม','วันที่สิ้นสุด'].forEach((t,i)=>{const c=w.getCell(10,i+1);c.value=t;hd(c);});
+   S.set.weeks.forEach((wk,i)=>{const r=11+i;put(w,'A'+r,'W'+(i+1),{b:1});put(w,'B'+r,{formula:'"W'+(i+1)+' ("&C'+r+'&"~"&D'+r+'&")"'},{f:calcF});put(w,'C'+r,wk[0],{f:inpF});put(w,'D'+r,wk[1],{f:inpF});
+     put(w,'E'+r,{formula:'DATE(YEAR($C$3),MONTH($C$3),C'+r+')'},{f:calcF,nf:'dd/mm/yyyy'});put(w,'F'+r,{formula:'MIN(DATE(YEAR($C$3),MONTH($C$3),D'+r+'),EOMONTH($C$3,0))'},{f:calcF,nf:'dd/mm/yyyy'});});
+   put(w,'A18','ประเภทเครื่อง (Type)',{b:1,f:subF});TYPES.forEach((t,i)=>put(w,'A'+(19+i),t,{f:inpF}));put(w,'C18','Line',{b:1,f:subF});['CNC','HYD'].forEach((t,i)=>put(w,'C'+(19+i),t,{f:inpF}));put(w,'D18','กะ',{b:1,f:subF});['D','N'].forEach((t,i)=>put(w,'D'+(19+i),t,{f:inpF}));}
+  /* ---- Machines ---- */
+  {const w=ws.M;put(w,'A1','เครื่อง — ทะเบียนเครื่อง + ตาราง mapping ชื่อกับไฟล์เดิม',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   ['Machine_ID','Line','Type','โรงงาน','ชื่อแสดงผล','CT (วินาที)','Loading (วินาที)','Efficiency','ชั่วโมงเดินเครื่อง','Target 100% (ชิ้น/กะ)','Target 75% (ชิ้น/กะ)','ชื่อในไฟล์ Downtime','ชื่อในไฟล์ Uptime Show','ชีตในไฟล์ Productivity','หมายเหตุ'].forEach((t,i)=>{const c=w.getCell(4,i+1);c.value=t;hd(c);});
+   w.getRow(4).height=32;[12,8,11,8,26,10,11,11,12,13,13,24,24,22,40].forEach((x,i)=>w.getColumn(i+1).width=x);
+   for(let i=0;i<NM+30;i++){const r=MR0+i,m=mach[i];
+     [m&&m.id,m&&m.line,m&&m.type,m&&m.plant,m&&m.name,m&&m.ct,m&&(m.load||0)].forEach((v,j)=>put(w,CL(j+1)+r,v||(v===0?0:null),{f:inpF}));
+     put(w,'H'+r,m&&num(m.eff)>0?m.eff:{formula:'IF($A'+r+'="","",'+q('S')+'$C$6)'},{f:m&&num(m.eff)>0?inpF:calcF,nf:'0%'});
+     put(w,'I'+r,{formula:'IF($A'+r+'="","",'+q('S')+'$C$5)'},{f:calcF,nf:'0.00'});
+     put(w,'J'+r,{formula:'IF(OR($A'+r+'="",N($F'+r+')=0),"",I'+r+'*3600/F'+r+')'},{f:calcF,nf:'#,##0.0'});
+     put(w,'K'+r,{formula:'IF(J'+r+'="","",J'+r+'*'+q('S')+'$C$4)'},{f:calcF,nf:'#,##0.0'});
+     put(w,'L'+r,m&&m.aDown||null,{f:inpF});put(w,'M'+r,m&&m.aUp||null,{f:inpF});put(w,'N'+r,m&&m.aProd||null,{f:inpF});put(w,'O'+r,m&&m.note||null,{f:inpF});}
+   w.views=[{state:'frozen',xSplit:2,ySplit:4,showGridLines:true}];}
+  /* ---- Entry ---- */
+  {const w=ws.E;
+   put(w,'A1','กรอกข้อมูล — ที่เดียวที่ต้องกรอก (1 แถว = วัน × กะ × เครื่อง × ชิ้นงาน)',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   put(w,'A2','ช่องสีเหลือง = กรอก | สีเทา = สูตร | เวลาเป็น “นาที” | เพิ่มคอลัมน์สาเหตุใหม่โดยแทรกคอลัมน์ระหว่าง ◀ กับ ▶ | แทรกคอลัมน์/แถวที่ไหนก็ได้ ทุกชีตปรับตาม',{i:1,nb:1,fc:dark});
+   put(w,'A4','กรอก (สีเหลือง)',{b:1,f:inpF,nb:1});put(w,CL(C.dt)+'4','คำนวณอัตโนมัติ (สีเทา)',{b:1,f:calcF,nb:1});
+   const H={};H[C.d]='วันที่';H[C.s]='กะ (D/N)';H[C.m]='เครื่อง (Machine_ID)';H[C.it]='ชิ้นงาน';H[C.std]='เวลามาตรฐาน (นาที)';H[C.inp]='ผลิตทั้งหมด';H[C.ng]='NG';H[C.wh]='Working Hours (ชม.) เว้นว่าง=มาตรฐาน÷60';H[C.ct]='CT ระบุเอง (วินาที)';H[C.note]='หมายเหตุ / LOT';
+   H[C.cs]='◀';H[C.ce]='▶';CAUSES.forEach((c,i)=>H[C.c0+i]=c[0]);
+   H[C.dt]='เวลาสูญเสียรวม (นาที)';H[C.work]='เวลาทำงานจริง (นาที)';H[C.ok]='OK';H[C.line]='Line';H[C.type]='Type';H[C.week]='สัปดาห์';H[C.ctu]='CT ที่ใช้ (วินาที)';H[C.base]='ฐานเวลา (นาที)';H[C.capa]='CAPA (ชิ้น)';H[C.t100]='Target 100% (ชิ้น)';H[C.upw]='%Uptime (เวลาจริง)';H[C.upc]='%Output (OK÷CAPA)';H[C.ngp]='%NG';H[C.act]='นับในรายงาน (1=ใช่)';
+   for(let c=1;c<=C.act;c++){const cell=w.getCell(5,c);cell.value=H[c];hd(cell,c>=C.dt?dark:(c===C.cs||c===C.ce?'FF2F5597':navy));}
+   w.getRow(5).height=62;
+   const widths={};widths[C.d]=12;widths[C.s]=7;widths[C.m]=13;widths[C.it]=30;widths[C.std]=11;widths[C.inp]=11;widths[C.ng]=8;widths[C.wh]=14;widths[C.ct]=12;widths[C.note]=20;widths[C.cs]=4;widths[C.ce]=4;
+   for(let c=C.c0;c<C.ce;c++)widths[c]=11;for(let c=C.dt;c<=C.act;c++)widths[c]=12;for(let c=1;c<=C.act;c++)w.getColumn(c).width=widths[c]||11;
+   const cp=(name,r)=>'$'+CL(C[name])+r;
+   const lk=(col,r)=>'INDEX('+MM(col)+',MATCH($'+CL(C.m)+r+','+MM('A')+',0))';
+   for(let i=0;i<PF-ER0+1;i++){const r=ER0+i,x=rowsAll[i];
+     const v=x?x.r:null;
+     put(w,CL(C.d)+r,x?date(x.date):null,{f:inpF,nf:'dd/mm/yyyy'});put(w,CL(C.s)+r,v&&v.s,{f:inpF,h:'center'});put(w,CL(C.m)+r,v&&v.m,{f:inpF});put(w,CL(C.it)+r,v&&v.it||null,{f:inpF});
+     put(w,CL(C.std)+r,v&&num(v.std)||null,{f:inpF,nf:'0'});put(w,CL(C.inp)+r,v&&num(v.inp)||null,{f:inpF,nf:'#,##0'});put(w,CL(C.ng)+r,v&&num(v.ng)||null,{f:inpF,nf:'#,##0'});
+     put(w,CL(C.wh)+r,v&&num(v.wh)||null,{f:inpF,nf:'0.00'});put(w,CL(C.ct)+r,v&&num(v.ct)||null,{f:inpF,nf:'0.0'});put(w,CL(C.note)+r,v&&v.note||null,{f:inpF});
+     put(w,CL(C.cs)+r,null,{f:'FFDDE3F0'});put(w,CL(C.ce)+r,null,{f:'FFDDE3F0'});
+     for(let k=0;k<16;k++)put(w,CL(C.c0+k)+r,v&&num((v.c||[])[k])||null,{f:inpF,nf:'0'});
+     const g=(c,formula,nf,b)=>put(w,CL(C[c])+r,{formula},{f:calcF,nf,b});
+     const blank=cp('m',r)+'=""';
+     g('dt','IF('+blank+',"",SUM($'+CL(C.cs)+r+':$'+CL(C.ce)+r+'))','0');
+     g('work','IF('+blank+',"",N('+cp('std',r)+')-'+cp('dt',r)+')','0');
+     g('ok','IF('+blank+',"",N('+cp('inp',r)+')-N('+cp('ng',r)+'))','#,##0');
+     g('line','IF('+blank+',"",IFERROR('+lk('B',r)+',"?"))');g('type','IF('+blank+',"",IFERROR('+lk('C',r)+',"?"))');
+     g('week','IF(OR('+cp('d',r)+'="",'+blank+'),"",IF(YEAR('+cp('d',r)+')*12+MONTH('+cp('d',r)+')<>YEAR('+q('S')+'$C$3)*12+MONTH('+q('S')+'$C$3),"",IFERROR(INDEX('+q('S')+'$A$11:$A$15,MATCH(DAY('+cp('d',r)+'),'+q('S')+'$C$11:$C$15,1)),"")))');
+     g('ctu','IF('+blank+',"",IF(N('+cp('ct',r)+')>0,'+cp('ct',r)+',IFERROR('+lk('F',r)+',0)))','0.0');
+     g('base','IF('+blank+',"",IF('+q('S')+'$C$7="op",'+q('S')+'$C$5*60,N('+cp('std',r)+')))','0');
+     g('capa','IF('+blank+',"",IFERROR(IF(N('+cp('wh',r)+')>0,'+cp('wh',r)+',N('+cp('std',r)+')/60)*3600*IF(N('+lk('H',r)+')>0,'+lk('H',r)+','+q('S')+'$C$6)/('+cp('ctu',r)+'+N('+lk('G',r)+')),0))','#,##0');
+     g('t100','IF('+blank+',"",IFERROR('+q('S')+'$C$5*3600/'+cp('ctu',r)+',0))','#,##0');
+     g('upw','IF(OR('+blank+',N('+cp('base',r)+')=0),"",'+cp('work',r)+'/'+cp('base',r)+')','0.0%');
+     g('upc','IF(OR('+blank+',N('+cp('capa',r)+')=0),"",'+cp('ok',r)+'/'+cp('capa',r)+')','0.0%');
+     g('ngp','IF('+blank+',"",IF(N('+cp('ok',r)+')+N('+cp('ng',r)+')=0,"",N('+cp('ng',r)+')/(N('+cp('ok',r)+')+N('+cp('ng',r)+'))))','0.0%');
+     g('act','IF('+blank+',"",IF(OR(N('+cp('inp',r)+')>0,N('+cp('dt',r)+')>0),1,0))','0');}
+   w.views=[{state:'frozen',xSplit:3,ySplit:5,showGridLines:true}];
+   w.autoFilter={from:{row:5,column:1},to:{row:5,column:C.act}};
+   const rng=(c)=>CL(c)+ER0+':'+CL(c)+PF;
+   w.dataValidations.add(rng(C.s),{type:'list',allowBlank:true,formulae:['"D,N"']});
+   w.dataValidations.add(rng(C.m),{type:'list',allowBlank:true,formulae:[q('M')+'$A$'+MR0+':$A$'+MRN]});
+   w.addConditionalFormatting({ref:CL(C.upw)+ER0+':'+CL(C.upw)+PF,rules:[{type:'expression',formulae:['AND(ISNUMBER('+CL(C.upw)+ER0+'),'+CL(C.upw)+ER0+'<'+q('S')+'$C$4)'],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:badF}}}},{type:'expression',formulae:['AND(ISNUMBER('+CL(C.upw)+ER0+'),'+CL(C.upw)+ER0+'>='+q('S')+'$C$4)'],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:goodF}}}}]});
+  }
+  /* ---- Weekly ---- */
+  {const w=ws.W;
+   put(w,'A1','Uptime รายสัปดาห์ — แทนไฟล์ Uptime Show (ดึงจากชีตกรอกข้อมูลอัตโนมัติ)',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   put(w,'B3','วันจันทร์ของสัปดาห์',{b:1});put(w,'C3',date(monday(R.wkStart||todayIso())),{f:inpF,nf:'dd/mm/yyyy'});
+   put(w,'B4','ฐานคำนวณ %Uptime',{b:1});put(w,'C4',R.basis==='capa'?'capa':'time',{f:inpF});put(w,'D4','time = เวลาทำงานจริง ÷ ฐานเวลา | capa = OK ÷ CAPA',{i:1,nb:1,fc:dark});
+   w.getCell('C4').dataValidation={type:'list',allowBlank:false,formulae:['"time,capa"']};
+   ['Machine_ID','ชื่อเครื่อง','CT','','',''].forEach((t,i)=>{const c=w.getCell(6,i+1);c.value=t;hd(c);const c2=w.getCell(7,i+1);hd(c2);});
+   for(let k=0;k<7;k++){for(const[base,lab,fc]of[[7,'กะเช้า ',navy],[14,'กะดึก ','FF2F5597']]){const c=w.getCell(6,base+k);c.value=lab+DOW[(k+1)%7];hd(c,fc);const d=w.getCell(7,base+k);d.value={formula:'$C$3+'+k};hd(d,fc);d.numFmt='dd/mm';}}
+   [['U','WEEK DAY'],['V','WEEK NIGHT'],['W','WEEK TOTAL']].forEach(([c,t])=>{const a=w.getCell(c+'6');a.value=t;hd(a);hd(w.getCell(c+'7'));});
+   const NW=Math.max(NM+10,20);
+   for(let i=0;i<NW;i++){const ra=8+2*i,rp=ra+1,mr=MR0+i;
+     put(w,'A'+ra,{formula:'IF('+q('M')+'A'+mr+'="","",'+q('M')+'A'+mr+')'},{b:1,f:subF});put(w,'B'+ra,{formula:'IF($A'+ra+'="","",'+q('M')+'E'+mr+')'},{b:1,f:subF});
+     put(w,'C'+ra,{formula:'IF($A'+ra+'="","",'+q('M')+'F'+mr+')'},{f:subF});put(w,'D'+ra,null,{f:subF});put(w,'E'+ra,null,{f:subF});put(w,'F'+ra,'Actual',{b:1,f:subF,h:'center'});
+     for(const c of'ABCDE')put(w,c+rp,null,{f:subF});put(w,'F'+rp,'%Uptime',{b:1,f:subF,h:'center'});
+     for(let k=0;k<7;k++)for(const[shift,base]of[['D',7],['N',14]]){const col=CL(base+k);
+       const crit=ER(C.m)+',$A'+ra+','+ER(C.d)+','+col+'$7,'+ER(C.s)+',"'+shift+'",'+ER(C.act)+',1';
+       put(w,col+ra,{formula:'IF($A'+ra+'="","",IF(COUNTIFS('+crit+')=0,"",SUMIFS('+ER(C.ok)+','+crit+')))'},{nf:'#,##0',h:'center'});
+       put(w,col+rp,{formula:'IF('+col+ra+'="","",IFERROR(IF($C$4="capa",'+col+ra+'/SUMIFS('+ER(C.capa)+','+crit+'),SUMIFS('+ER(C.work)+','+crit+')/SUMIFS('+ER(C.base)+','+crit+')),""))'},{nf:'0.0%',h:'center'});}
+     for(const[col,sh]of[['U','"D"'],['V','"N"'],['W','"*"']]){
+       const crit=ER(C.m)+',$A'+ra+','+ER(C.d)+',">="&$G$7,'+ER(C.d)+',"<="&$M$7,'+ER(C.s)+','+sh+','+ER(C.act)+',1';
+       put(w,col+ra,{formula:'IF($A'+ra+'="","",IF(COUNTIFS('+crit+')=0,"",SUMIFS('+ER(C.ok)+','+crit+')))'},{b:1,nf:'#,##0',h:'center'});
+       put(w,col+rp,{formula:'IF('+col+ra+'="","",IFERROR(IF($C$4="capa",'+col+ra+'/SUMIFS('+ER(C.capa)+','+crit+'),SUMIFS('+ER(C.work)+','+crit+')/SUMIFS('+ER(C.base)+','+crit+')),""))'},{b:1,nf:'0.0%',h:'center'});}}
+   [11,24,7,8,8,9].forEach((x,i)=>w.getColumn(i+1).width=x);for(let c=7;c<=23;c++)w.getColumn(c).width=10;
+   w.views=[{state:'frozen',xSplit:6,ySplit:7,showGridLines:true}];
+   const last=8+2*NW-1;
+   w.addConditionalFormatting({ref:'G8:W'+last,rules:[{type:'expression',formulae:['AND(ISNUMBER(G8),$F8="%Uptime",G8<'+q('S')+'$C$4)'],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:badF}}}},{type:'expression',formulae:['AND(ISNUMBER(G8),$F8="%Uptime",G8>='+q('S')+'$C$4)'],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:goodF}}}}]});}
+  /* ---- Summary ---- */
+  {const w=ws.U;
+   put(w,'A1','สรุปผล — แทน 생산 종합 현황 (Uptime = เวลาทำงานจริง ÷ ฐานเวลา, Output = OK ÷ CAPA)',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   put(w,'B3','Target Uptime',{b:1});put(w,'C3',{formula:q('S')+'$C$4'},{f:calcF,nf:'0%'});
+   const heads=[];for(let i=0;i<5;i++)heads.push(q('S')+'$B$'+(11+i));heads.push('"ทั้งเดือน"');
+   const starts=[],ends=[];for(let i=0;i<5;i++){starts.push(q('S')+'$E$'+(11+i));ends.push(q('S')+'$F$'+(11+i));}starts.push(q('S')+'$C$3');ends.push('EOMONTH('+q('S')+'$C$3,0)');
+   const table=(row0,label,keyRange,keyOf,n)=>{
+     put(w,'B'+(row0+2),label,{b:1,fc:'FFFFFFFF',f:navy,h:'center'});put(w,'B'+(row0+3),null,{f:navy});
+     for(let p=0;p<6;p++){const c0=3+p*3;
+       put(w,CL(c0)+row0,{formula:starts[p]},{i:1,nb:1,nf:'dd/mm/yy',fc:dark});put(w,CL(c0)+(row0+1),{formula:ends[p]},{i:1,nb:1,nf:'dd/mm/yy',fc:dark});
+       const hc=w.getCell(CL(c0)+(row0+2));hc.value={formula:heads[p]};hd(hc);w.mergeCells(CL(c0)+(row0+2)+':'+CL(c0+2)+(row0+2));
+       ["Q'ty",'Uptime','Output'].forEach((t,k)=>{const c=w.getCell(CL(c0+k)+(row0+3));c.value=t;hd(c);});}
+     for(let i=0;i<n;i++){const r=row0+4+i;put(w,'B'+r,keyOf(i),{b:1,f:subF});
+       for(let p=0;p<6;p++){const c0=3+p*3;const crit=keyRange+',$B'+r+','+ER(C.d)+',">="&'+CL(c0)+'$'+row0+','+ER(C.d)+',"<="&'+CL(c0)+'$'+(row0+1)+','+ER(C.act)+',1';
+         put(w,CL(c0)+r,{formula:'IF($B'+r+'="","",SUMIFS('+ER(C.ok)+','+crit+'))'},{nf:'#,##0'});
+         put(w,CL(c0+1)+r,{formula:'IF($B'+r+'="","",IFERROR(SUMIFS('+ER(C.work)+','+crit+')/SUMIFS('+ER(C.base)+','+crit+'),""))'},{nf:'0.0%',b:1});
+         put(w,CL(c0+2)+r,{formula:'IF($B'+r+'="","",IFERROR(SUMIFS('+ER(C.ok)+','+crit+')/SUMIFS('+ER(C.capa)+','+crit+'),""))'},{nf:'0.0%',fc:dark});}}
+     return row0+4+n;};
+   const t0=5;const end1=table(t0,'ประเภท (Type)',ER(C.type),i=>({formula:q('S')+'A'+(19+i)}),TYPES.length);
+   const m0=end1+3;put(w,'B'+(m0-1),'รายเครื่อง',{b:1,nb:1});const NMW=Math.max(NM+10,20);
+   const end2=table(m0+1,'เครื่อง',ER(C.m),i=>({formula:'IF('+q('M')+'A'+(MR0+i)+'="","",'+q('M')+'A'+(MR0+i)+')'}),NMW);
+   w.getColumn(2).width=16;for(let c=3;c<=20;c++)w.getColumn(c).width=10;
+   w.addConditionalFormatting({ref:'C'+(t0+4)+':T'+end2,rules:[{type:'expression',formulae:['AND(ISNUMBER(C'+(t0+4)+'),MOD(COLUMN(C'+(t0+4)+')-3,3)=1,C'+(t0+4)+'<$C$3)'],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:badF}}}}]});
+   w.views=[{state:'frozen',xSplit:2,showGridLines:true}];}
+  /* ---- Pareto ---- */
+  {const w=ws.P,NPOS=30;
+   put(w,'A1','Pareto สาเหตุการหยุดเครื่อง (นาที → ชั่วโมง) — รวมสาเหตุที่เพิ่มใหม่ในชีตกรอกข้อมูลอัตโนมัติ',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   put(w,'B3','Line (All / CNC / HYD)',{b:1});put(w,'C3','All',{f:inpF});w.getCell('C3').dataValidation={type:'list',allowBlank:false,formulae:['"All,CNC,HYD"']};
+   put(w,'B4','วันที่เริ่ม',{b:1});put(w,'C4',date(rowsAll.length?rowsAll[0].date:S.set.month+'-01'),{f:inpF,nf:'dd/mm/yyyy'});
+   put(w,'B5','วันที่สิ้นสุด',{b:1});put(w,'C5',date(rowsAll.length?rowsAll[rowsAll.length-1].date:S.set.month+'-28'),{f:inpF,nf:'dd/mm/yyyy'});
+   put(w,'B6','เงื่อนไข Line (ช่วยคำนวณ)',{i:1,nb:1,fc:dark});put(w,'C6',{formula:'IF(C3="All","*",C3)'},{f:calcF});
+   ['ตำแหน่งคอลัมน์','สาเหตุ (จากหัวตารางในชีตกรอกข้อมูล)','รวม (นาที)','รวม (ชั่วโมง)','% ของทั้งหมด','อันดับ'].forEach((t,i)=>{const c=w.getCell(8,i+1);c.value=t;hd(c);});
+   ['อันดับ','สาเหตุ (เรียงมาก→น้อย)','ชั่วโมง','%','สะสม %'].forEach((t,i)=>{const c=w.getCell(8,8+i);c.value=t;hd(c);});
+   const P0=9,PN=P0+NPOS-1;
+   for(let i=0;i<NPOS;i++){const r=P0+i,pos=i+2;
+     put(w,'A'+r,pos,{fc:'FF808080',h:'center'});
+     put(w,'B'+r,{formula:'IF($A'+r+'>=COLUMNS('+CAUSEHDR+'),"",IF(INDEX('+CAUSEHDR+',$A'+r+')="","",INDEX('+CAUSEHDR+',$A'+r+')))'},{f:calcF});
+     put(w,'C'+r,{formula:'IF($B'+r+'="","",SUMIFS(INDEX('+CAUSEBLK+',0,$A'+r+'),'+ER(C.d)+',">="&$C$4,'+ER(C.d)+',"<="&$C$5,'+ER(C.line)+',$C$6,'+ER(C.act)+',1))'},{nf:'#,##0'});
+     put(w,'D'+r,{formula:'IF($B'+r+'="","",C'+r+'/60)'},{nf:'#,##0.0'});
+     put(w,'E'+r,{formula:'IF($B'+r+'="","",IF(SUM($C$'+P0+':$C$'+PN+')=0,0,C'+r+'/SUM($C$'+P0+':$C$'+PN+')))'},{nf:'0.0%'});
+     put(w,'F'+r,{formula:'IF($B'+r+'="","",RANK(C'+r+',$C$'+P0+':$C$'+PN+')+COUNTIF($C$'+P0+':C'+r+',C'+r+')-1)'},{h:'center'});
+     put(w,'H'+r,i+1,{h:'center'});
+     put(w,'I'+r,{formula:'IF(H'+r+'>COUNT($C$'+P0+':$C$'+PN+'),"",INDEX($B$'+P0+':$B$'+PN+',MATCH(H'+r+',$F$'+P0+':$F$'+PN+',0)))'},{f:calcF});
+     put(w,'J'+r,{formula:'IF(I'+r+'="","",INDEX($D$'+P0+':$D$'+PN+',MATCH(H'+r+',$F$'+P0+':$F$'+PN+',0)))'},{nf:'#,##0.0'});
+     put(w,'K'+r,{formula:'IF(I'+r+'="","",INDEX($E$'+P0+':$E$'+PN+',MATCH(H'+r+',$F$'+P0+':$F$'+PN+',0)))'},{nf:'0.0%'});
+     put(w,'L'+r,{formula:'IF(I'+r+'="","",SUM($K$'+P0+':K'+r+'))'},{nf:'0.0%'});}
+   put(w,'B'+(PN+1),'รวม',{b:1,f:subF});put(w,'C'+(PN+1),{formula:'SUM(C'+P0+':C'+PN+')'},{b:1,f:subF,nf:'#,##0'});put(w,'D'+(PN+1),{formula:'C'+(PN+1)+'/60'},{b:1,f:subF,nf:'#,##0.0'});
+   [8,40,11,11,11,8,3,8,40,10,9,10].forEach((x,i)=>w.getColumn(i+1).width=x);w.getColumn(1).hidden=false;}
+  /* ---- Detail ---- */
+  {const w=ws.D,NPOS=30;
+   put(w,'A1','รายละเอียดสาเหตุ — รายวัน × สาเหตุ และรายเครื่อง × สาเหตุ (ชั่วโมง) ใช้ Line/ช่วงวันที่จากชีต Pareto',{b:1,nb:1}).font={name:FN,size:14,bold:true,color:{argb:navy}};
+   const PR=SH.P;const pq="'"+PR+"'!";
+   put(w,'A4','ตำแหน่ง',{i:1,nb:1,fc:dark});for(let k=0;k<NPOS;k++)put(w,CL(2+k)+'4',k+2,{fc:'FF808080',h:'center',nb:1});
+   const hdrRow=(r,first)=>{const a=w.getCell('A'+r);a.value=first;hd(a);for(let k=0;k<NPOS;k++){const c=w.getCell(CL(2+k)+r);c.value={formula:'IF('+CL(2+k)+'$4>=COLUMNS('+CAUSEHDR+'),"",IF(INDEX('+CAUSEHDR+','+CL(2+k)+'$4)="","",INDEX('+CAUSEHDR+','+CL(2+k)+'$4)))'};hd(c);}const t=w.getCell(CL(2+NPOS)+r);t.value='รวม (ชม.)';hd(t);w.getRow(r).height=48;};
+   put(w,'A6','▣ รายวัน × สาเหตุ (ชั่วโมง) ของเดือนในชีตตั้งค่า',{b:1,nb:1});hdrRow(7,'วันที่');
+   for(let d=1;d<=31;d++){const r=7+d;
+     put(w,'A'+r,{formula:'IF(DAY(DATE(YEAR('+q('S')+'$C$3),MONTH('+q('S')+'$C$3),'+d+'))<>'+d+',"",DATE(YEAR('+q('S')+'$C$3),MONTH('+q('S')+'$C$3),'+d+'))'},{nf:'dd/mm',h:'center',f:subF});
+     for(let k=0;k<NPOS;k++){const col=CL(2+k);put(w,col+r,{formula:'IF(OR($A'+r+'="",'+col+'$7=""),"",SUMIFS(INDEX('+CAUSEBLK+',0,'+col+'$4),'+ER(C.d)+',$A'+r+','+ER(C.line)+','+pq+'$C$6,'+ER(C.act)+',1)/60)'},{nf:'0.0;-0.0;""'});}
+     put(w,CL(2+NPOS)+r,{formula:'IF($A'+r+'="","",SUM(B'+r+':'+CL(1+NPOS)+r+'))'},{b:1,nf:'0.0;-0.0;""'});}
+   const M0=7+32+3;put(w,'A'+(M0-1),'▣ รายเครื่อง × สาเหตุ (ชั่วโมง) ช่วงวันที่ตามชีต Pareto',{b:1,nb:1});hdrRow(M0,'Machine_ID');
+   const NMW=Math.max(NM+10,20);
+   for(let i=0;i<NMW;i++){const r=M0+1+i;put(w,'A'+r,{formula:'IF('+q('M')+'A'+(MR0+i)+'="","",'+q('M')+'A'+(MR0+i)+')'},{b:1,f:subF});
+     for(let k=0;k<NPOS;k++){const col=CL(2+k);put(w,col+r,{formula:'IF(OR($A'+r+'="",'+col+'$'+M0+'=""),"",SUMIFS(INDEX('+CAUSEBLK+',0,'+col+'$4),'+ER(C.m)+',$A'+r+','+ER(C.d)+',">="&'+pq+'$C$4,'+ER(C.d)+',"<="&'+pq+'$C$5,'+ER(C.act)+',1)/60)'},{nf:'0.0;-0.0;""'});}
+     put(w,CL(2+NPOS)+r,{formula:'IF($A'+r+'="","",SUM(B'+r+':'+CL(1+NPOS)+r+'))'},{b:1,nf:'0.0;-0.0;""'});}
+   w.getColumn(1).width=12;for(let c=2;c<=2+NPOS;c++)w.getColumn(c).width=11;w.views=[{state:'frozen',xSplit:1,showGridLines:true}];}
+  X.views=[{activeTab:1}];
+  return X.xlsx.writeBuffer();
+}
+async function exportXlsx(){
+  const dl=window.claude?await window.claude.use('downloads'):null;
+  if(!dl){toast('ดาวน์โหลดไม่ได้ในมุมมองนี้');return;}
+  if(!window.ExcelJS){toast('โหลดไลบรารี Excel ไม่ได้ จึงส่งออกเป็น CSV แทน');exportCsv();return;}
+  try{toast('กำลังสร้างไฟล์ Excel…');const buf=await buildWorkbook();
+    await dl.save({filename:'uptime-master-'+S.set.month+'.xlsx',data:buf});toast('สร้างไฟล์ Excel แล้ว');}
+  catch(e){if(!e||e.code!=='declined'){console.error(e);toast('สร้างไฟล์ Excel ไม่สำเร็จ');}}
+}
+
+/* ---------- WEEKLY (replaces Uptime Show) ---------- */
+function sumUp(xs){
+  const ok=xs.reduce((a,x)=>a+x.k.ok,0),work=xs.reduce((a,x)=>a+x.k.work,0),base=xs.reduce((a,x)=>a+x.k.base,0),capa=xs.reduce((a,x)=>a+x.k.capa,0);
+  const n=R.basis==='capa'?ok:work,d=R.basis==='capa'?capa:base;return{ok,up:d>0?n/d:null};
+}
+function vWeekly(root){
+  if(!R.wkStart){const ks=Object.keys(S.days).sort();R.wkStart=monday(ks.length?ks[ks.length-1]:todayIso());}
+  const days=[0,1,2,3,4,5,6].map(i=>addDays(R.wkStart,i));
+  const rows=live().filter(x=>x.date>=days[0]&&x.date<=days[6]);
+  root.append(h('h2',null,'Uptime รายสัปดาห์'),h('p',{class:'sub'},'แทนไฟล์ Uptime Show: Actual คือยอด OK ส่วน %Uptime = เวลาทำงานจริง (เวลามาตรฐาน − เวลาสูญเสียทุกสาเหตุ) ÷ ฐานเวลา แยกกะเช้า/กะดึก'));
+  const nav=n=>()=>{R.wkStart=addDays(R.wkStart,7*n);render();};
+  root.append(h('div',{class:'bar'},
+    h('div',{class:'seg'},h('button',{type:'button',onclick:nav(-1)},'◀ สัปดาห์ก่อน'),h('button',{type:'button',onclick:nav(1)},'สัปดาห์ถัดไป ▶')),
+    h('strong',null,dmy(days[0])+' – '+dmy(days[6])),
+    h('span',{class:'grow'}),
+    h('div',{class:'seg',role:'group','aria-label':'ฐานคำนวณ'},
+      h('button',{type:'button','aria-pressed':String(R.basis==='time'),onclick:()=>{R.basis='time';render();},title:'(เวลามาตรฐาน − เวลาสูญเสีย) ÷ ฐานเวลา'},'Uptime เวลาจริง'),
+      h('button',{type:'button','aria-pressed':String(R.basis==='capa'),onclick:()=>{R.basis='capa';render();},title:'ยอด OK ÷ CAPA'},'Output ÷ CAPA')),
+    h('label',{class:'fld',style:'flex-direction:row;align-items:center;gap:6px'},h('input',{type:'checkbox',checked:R.showAll,onchange:e=>{R.showAll=e.target.checked;render();}}),'แสดงทุกเครื่อง')));
+  const mach=machList().filter(m=>R.showAll||rows.some(x=>x.r.m===m.id));
+  if(!mach.length){root.append(h('div',{class:'empty'},h('b','ไม่มีข้อมูลในสัปดาห์นี้'),'เลื่อนสัปดาห์ หรือกรอกข้อมูลในแท็บกรอกข้อมูล'));return;}
+  root.append(h('div',{class:'legend'},h('span',null,h('i',{class:'dot',style:'background:var(--good)'}),'ถึงเป้า '+pct(S.set.target,0)),h('span',null,h('i',{class:'dot',style:'background:var(--bad)'}),'ต่ำกว่าเป้า'),h('span',null,'คอลัมน์รวมสัปดาห์ = ยอด OK รวม และ % ถ่วงน้ำหนักตามเวลา (รวมเวลาทำงาน ÷ รวมฐานเวลา)')));
+  const cellFor=(mid,date,shift)=>{const xs=rows.filter(x=>x.r.m===mid&&x.date===date&&x.r.s===shift);return xs.length?sumUp(xs):null;};
+  const th=[h('th',{class:'l',rowspan:2},'เครื่อง'),h('th',{colspan:7,class:'dd'},'กะเช้า'),h('th',{colspan:7,class:'nn'},'กะดึก'),h('th',{colspan:3},'รวมสัปดาห์')];
+  const th2=[...[0,1].flatMap(()=>days.map(d=>h('th',null,DOW[dow(d)]+' '+dm(d)))),h('th',null,'เช้า'),h('th',null,'ดึก'),h('th',null,'รวม')];
+  const body=mach.map(m=>{
+    const tds=[];
+    for(const s of['D','N'])for(const d of days){const c=cellFor(m.id,d,s);
+      tds.push(c?h('td',{class:'cell num '+clsUp(c.up)},f0(c.ok),h('small',null,pct(c.up))):h('td',{class:'cell'}));}
+    const mine=rows.filter(x=>x.r.m===m.id);
+    const wcell=xs=>{if(!xs.length)return h('td',{class:'cell'});const w=sumUp(xs);return h('td',{class:'cell num '+clsUp(w.up),style:'font-weight:600'},f0(w.ok),h('small',null,pct(w.up)));};
+    return h('tr',null,h('td',{class:'l',style:'position:sticky;left:0;background:var(--surface);z-index:1;min-width:150px'},h('b',null,m.id),h('div',{style:'font-size:11px;color:var(--ink2)'},m.name||'')),...tds,wcell(mine.filter(x=>x.r.s==='D')),wcell(mine.filter(x=>x.r.s==='N')),wcell(mine));});
+  root.append(h('div',{class:'scroll wk'},h('table',null,h('thead',null,h('tr',null,th),h('tr',null,th2)),h('tbody',null,body))));
+}
+
+/* ---------- SUMMARY (replaces 생산 종합 현황) ---------- */
+function periods(){
+  const ym=S.set.month,last=mEnd(ym);
+  const w=S.set.weeks.map(([a,b],i)=>({l:'W'+(i+1)+' ('+a+'~'+b+')',s:ym+'-'+String(Math.min(a,last)).padStart(2,'0'),e:ym+'-'+String(Math.min(b,last)).padStart(2,'0')}));
+  return[...w,{l:'ทั้งเดือน',s:ym+'-01',e:ym+'-'+String(last).padStart(2,'0'),month:true}];}
+function agg(rows,pred){let ok=0,capa=0,ng=0,dt=0,work=0,base=0;for(const x of rows)if(pred(x)){ok+=x.k.ok;capa+=x.k.capa;ng+=x.k.ng;dt+=x.k.dt;work+=x.k.work;base+=x.k.base;}
+  return{ok,capa,ng,dt,work,base,up:base>0?work/base:null,out:capa>0?ok/capa:null};}
+function vSummary(root){
+  const rows=live(),P=periods(),mon=P[5];
+  const inP=(p)=>x=>x.date>=p.s&&x.date<=p.e;
+  const tot=agg(rows,inP(mon));
+  root.append(h('h2',null,'สรุปผล · '+S.set.month),h('p',{class:'sub'},'แทน 생산 종합 현황: Uptime = เวลาทำงานจริงหลังหักเวลาสูญเสีย ÷ ฐานเวลา เทียบเป้า '+pct(S.set.target,0)+' แยกตามประเภทเครื่องและรายเครื่อง ส่วน Output = ยอด OK ÷ CAPA'));
+  if(!rows.length){root.append(h('div',{class:'empty'},h('b','ยังไม่มีข้อมูลในเดือนนี้'),'กรอกข้อมูลในแท็บกรอกข้อมูล หรือเปลี่ยนเดือนในตั้งค่า'));return;}
+  root.append(h('div',{class:'tiles'},
+    h('div',{class:'tile'},h('b',{class:tot.up==null?'':(tot.up>=S.set.target?'good':'bad')},pct(tot.up)),h('span',null,'Uptime เวลาจริง · เป้า '+pct(S.set.target,0))),
+    h('div',{class:'tile'},h('b',null,f0(tot.ok)),h('span',null,'ยอด OK ทั้งเดือน (ชิ้น)')),
+    h('div',{class:'tile'},h('b',null,f1(tot.dt/60)),h('span',null,'เวลาสูญเสียรวม (ชั่วโมง)')),
+    h('div',{class:'tile'},h('b',null,pct(tot.ok+tot.ng>0?tot.ng/(tot.ok+tot.ng):null,2)),h('span',null,'อัตรา NG'))));
+  const head=[h('th',{class:'l',rowspan:2},'ประเภท'),...P.map(p=>h('th',{colspan:3},p.l))];
+  const head2=P.flatMap(()=>[h('th',null,"Q'ty"),h('th',null,'Uptime'),h('th',null,'Output')]);
+  const cells=a=>[h('td',{class:'num'},f0(a.ok)),h('td',{class:'num '+clsUp(a.up),style:'font-weight:600'},pct(a.up)),h('td',{class:'num',style:'color:var(--ink2)'},pct(a.out))];
+  const trT=TYPES.map(t=>{const rs=rows.filter(x=>x.type===t);if(!rs.length)return null;return h('tr',null,h('td',{class:'l'},h('b',null,t)),...P.flatMap(p=>cells(agg(rs,inP(p)))));}).filter(Boolean);
+  const other=rows.filter(x=>!TYPES.includes(x.type));if(other.length)trT.push(h('tr',null,h('td',{class:'l'},h('b',null,'ไม่ระบุประเภท')),...P.flatMap(p=>cells(agg(other,inP(p))))));
+  trT.push(h('tr',{style:'font-weight:700'},h('td',{class:'l'},'รวม'),...P.flatMap(p=>cells(agg(rows,inP(p))))));
+  root.append(h('div',{class:'sec'},'Uptime ตามประเภทเครื่อง'),h('div',{class:'scroll'},h('table',null,h('thead',null,h('tr',null,head),h('tr',null,head2)),h('tbody',null,trT))));
+  const mm=machList().filter(m=>rows.some(x=>x.r.m===m.id));
+  const trM=mm.map(m=>{const rs=rows.filter(x=>x.r.m===m.id);return h('tr',null,h('td',{class:'l'},h('b',null,m.id),' ',h('span',{style:'color:var(--ink2);font-size:11px'},m.type||'')),...P.flatMap(p=>cells(agg(rs,inP(p)))));});
+  root.append(h('div',{class:'sec'},'Uptime รายเครื่อง'),h('div',{class:'scroll',style:'max-height:60vh'},h('table',null,h('thead',null,h('tr',null,[h('th',{class:'l',rowspan:2},'เครื่อง'),...P.map(p=>h('th',{colspan:3},p.l))]),h('tr',null,head2)),h('tbody',null,trM))));
+  const bars=mm.map(m=>({m,a:agg(rows.filter(x=>x.r.m===m.id),inP(mon))})).filter(b=>b.a.up!=null).sort((a,b)=>a.a.up-b.a.up);
+  const mx=Math.max(1,...bars.map(b=>b.a.up));
+  root.append(h('div',{class:'sec'},'Uptime เวลาจริงรายเครื่อง เทียบเป้า (ทั้งเดือน) · เรียงจากต่ำไปสูง'),
+    h('div',{class:'hb'},bars.flatMap(b=>[h('div',null,h('b',null,b.m.id),' ',h('span',{style:'color:var(--ink2);font-size:11px'},b.m.name||'')),
+      h('div',{class:'track'},h('i',{class:clsUp(b.a.up),style:'width:'+Math.min(100,b.a.up/mx*100)+'%'}),h('u',{style:'left:'+S.set.target/mx*100+'%',title:'เป้า'})),h('div',{class:'num '+(b.a.up>=S.set.target?'good':'bad')},pct(b.a.up))])),
+    h('p',{class:'hint'},'เส้นดำแนวตั้ง = เป้า '+pct(S.set.target,0)));
+}
+
+/* ---------- DOWNTIME (replaces 기계 정지 원인) ---------- */
+function vDowntime(root){
+  const rows=live();const ks=rows.map(x=>x.date).sort();
+  if(!R.dtFrom)R.dtFrom=ks[0]||S.set.month+'-01';if(!R.dtTo)R.dtTo=ks[ks.length-1]||S.set.month+'-'+mEnd(S.set.month);
+  const f=rows.filter(x=>x.date>=R.dtFrom&&x.date<=R.dtTo&&(!R.dtLine||x.line===R.dtLine));
+  const tot=Array(16).fill(0);for(const x of f)(x.r.c||[]).forEach((v,i)=>tot[i]+=num(v));
+  const sum=tot.reduce((a,b)=>a+b,0);
+  root.append(h('h2',null,'สาเหตุการหยุดเครื่อง'),h('p',{class:'sub'},'แทนชีต 기계 정지 원인: Pareto ของ 16 สาเหตุ เวลาที่กรอกเป็นนาที แสดงผลเป็นชั่วโมง'));
+  const lines=[...new Set(live().map(x=>x.line))].sort();
+  root.append(h('div',{class:'bar'},
+    h('label',{class:'fld'},'Line',h('select',{onchange:e=>{R.dtLine=e.target.value;render();},value:R.dtLine},h('option',{value:''},'ทั้งหมด'),...lines.map(l=>h('option',{value:l,selected:l===R.dtLine},l)))),
+    h('label',{class:'fld'},'ตั้งแต่',h('input',{type:'date',value:R.dtFrom,onchange:e=>{R.dtFrom=e.target.value;render();}})),
+    h('label',{class:'fld'},'ถึง',h('input',{type:'date',value:R.dtTo,onchange:e=>{R.dtTo=e.target.value;render();}}))));
+  if(!sum){root.append(h('div',{class:'empty'},h('b','ไม่มีเวลาหยุดในช่วงนี้'),'ปรับช่วงวันที่หรือ Line'));return;}
+  const ord=tot.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v||a.i-b.i).filter(x=>x.v>0);
+  const mx=ord[0].v;let cum=0,cut=false;const parts=[];
+  ord.forEach((x,n)=>{cum+=x.v;parts.push(h('div',{class:'num',style:'color:var(--ink2)'},String(n+1)),h('div',null,CAUSES[x.i][0],h('div',{style:'font-size:11px;color:var(--ink2)'},CAUSES[x.i][2])),
+      h('div',{class:'track'},h('i',{style:'width:'+x.v/mx*100+'%'})),h('div',{class:'num'},f1(x.v/60)+' ชม.'),h('div',{class:'num',style:'color:var(--ink2)'},pct(cum/sum,0)));
+    if(!cut&&cum/sum>=0.8&&n<ord.length-1){cut=true;parts.push(h('div',{class:'cut'},'ถึง 80% ของเวลาหยุดทั้งหมด · จุดที่ควรเริ่มแก้'));}});
+  root.append(h('div',{class:'tiles'},h('div',{class:'tile'},h('b',null,f1(sum/60)),h('span',null,'ชั่วโมงหยุดรวม')),h('div',{class:'tile'},h('b',null,CAUSES[ord[0].i][0]),h('span',null,'สาเหตุอันดับ 1 · '+pct(ord[0].v/sum,0))),h('div',{class:'tile'},h('b',null,String(new Set(f.filter(x=>x.k.dt>0).map(x=>x.r.m)).size)),h('span',null,'เครื่องที่มีเวลาหยุด'))));
+  root.append(h('div',{class:'sec'},'Pareto (เรียงจากมากไปน้อย · เปอร์เซ็นต์ท้ายแถว = สะสม)'),h('div',{class:'par'},parts));
+  const mm=machList().map(m=>{const t=Array(16).fill(0);f.filter(x=>x.r.m===m.id).forEach(x=>(x.r.c||[]).forEach((v,i)=>t[i]+=num(v)));return{m,t,s:t.reduce((a,b)=>a+b,0)};}).filter(x=>x.s>0).sort((a,b)=>b.s-a.s);
+  const hmax=Math.max(...mm.flatMap(x=>x.t));
+  root.append(h('div',{class:'sec'},'รายเครื่อง × สาเหตุ (ชั่วโมง)'),
+    h('div',{class:'legend'},CAUSES.map((c,i)=>h('span',null,h('b',null,String(i+1)),' '+c[0]))),
+    h('div',{class:'scroll heat',style:'max-height:60vh'},h('table',null,h('thead',null,h('tr',null,h('th',{class:'l'},'เครื่อง'),...CAUSES.map((c,i)=>h('th',{title:c[0]+' / '+c[2]},String(i+1))),h('th',null,'รวม'))),
+      h('tbody',null,mm.map(x=>h('tr',null,h('td',{class:'l'},h('b',null,x.m.id)),...x.t.map(v=>h('td',{style:v?'background:color-mix(in srgb,var(--accent) '+Math.round(v/hmax*65)+'%,transparent)':''},v?f1(v/60):'')),h('td',{style:'font-weight:700'},f1(x.s/60))))))));
+}
+
+/* ---------- MACHINES ---------- */
+const MF=[['id','Machine_ID',90,'text'],['line','Line',70,'line'],['type','Type',100,'type'],['plant','โรงงาน',60,'text'],['name','ชื่อแสดงผล',170,'text'],['ct','CT (วินาที)',70,'number'],['load','Loading (วินาที)',70,'number'],['eff','Efficiency (เว้นว่าง=ค่าตั้งต้น)',90,'number'],
+  ['aDown','ชื่อในไฟล์ Downtime',150,'text'],['aUp','ชื่อในไฟล์ Uptime Show',150,'text'],['aProd','ชีตใน Productivity',150,'text'],['note','หมายเหตุ',160,'text']];
+function vMachines(root){
+  root.append(h('h2',null,'ทะเบียนเครื่อง'),h('p',{class:'sub'},'ที่เดียวที่ตั้งค่า CT ประเภท และชื่อที่เครื่องนี้ใช้ในไฟล์เดิมทั้ง 3 ไฟล์ (ตาราง mapping) เพิ่มเครื่องใหม่ที่นี่ แล้วเลือกใช้ในแท็บกรอกข้อมูล'));
+  const ms=machList();const used=new Set(all().map(x=>x.r.m));
+  const mk=(m,isNew)=>{const tr=h('tr',null);tr._id=m.id;
+    MF.forEach(([k,l,w,t])=>{let inp;
+      if(t==='line'){inp=h('select',{'data-k':k},h('option',{value:''},'—'),...['CNC','HYD'].map(v=>h('option',{value:v},v)));inp.value=m[k]||'';}
+      else if(t==='type'){inp=h('select',{'data-k':k},h('option',{value:''},'—'),...TYPES.map(v=>h('option',{value:v},v)));inp.value=m[k]||'';}
+      else inp=h('input',{'data-k':k,type:t==='number'?'number':'text',step:'any',min:'0',value:m[k]==null||m[k]===0&&t==='number'?'':String(m[k]),disabled:k==='id'&&!isNew,'aria-label':l});
+      tr.append(h('td',{style:'min-width:'+w+'px'},inp));});
+    tr.append(h('td',{class:'c'},isNew?h('button',{class:'btn sm pri',type:'button','data-a':'add'},'เพิ่ม'):h('button',{class:'x',type:'button','data-a':'del',title:used.has(m.id)?'มีข้อมูลที่ใช้เครื่องนี้อยู่':'ลบ'},'✕')));
+    return tr;};
+  const readM=tr=>{const o={};MF.forEach(([k,,,t])=>{if(k==='id')return;const v=tr.querySelector('[data-k="'+k+'"]').value.trim();o[k]=t==='number'?num(v):v;});return o;};
+  const nrow=mk({},true);
+  const tb=h('tbody',null,nrow,...ms.map(m=>mk(m,false)));
+  tb.addEventListener('change',e=>{const tr=e.target.closest('tr');if(!tr||!tr._id)return;const old=S.machines[tr._id]||{};saveMachine(tr._id,{...old,...readM(tr)});});
+  tb.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const tr=b.closest('tr');
+    if(b.dataset.a==='add'){const id=tr.querySelector('[data-k="id"]').value.trim();
+      if(!/^[A-Za-z0-9_\-.~:@+]{1,60}$/.test(id)){toast('Machine_ID ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข และ - _ . (ไม่มีเว้นวรรค)');return;}
+      if(S.machines[id]){toast('มี Machine_ID นี้แล้ว');return;}
+      const o=readM(tr);o.ord=Math.max(0,...ms.map(m=>num(m.ord)))+1;saveMachine(id,o);render();return;}
+    if(b.dataset.a==='del'){if(used.has(tr._id)){toast('ลบไม่ได้ เพราะมีข้อมูลที่ใช้เครื่องนี้อยู่');return;}
+      if(b.dataset.armed){deleteMachine(tr._id);render();return;}b.dataset.armed='1';b.textContent='ลบ?';b.style.color='var(--bad)';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='✕';b.style.color='';}},3000);}});
+  root.append(h('div',{class:'scroll mtbl',style:'max-height:70vh'},h('table',null,h('thead',null,h('tr',null,[...MF.map(f=>h('th',null,f[1])),h('th',null,'')])),tb)),
+    h('p',{class:'hint'},'แถวบนสุดสำหรับเพิ่มเครื่องใหม่ · แก้ไขแล้วบันทึกอัตโนมัติเมื่อออกจากช่อง · Type ใช้จัดกลุ่มในแท็บสรุปผล'));
+}
+
+/* ---------- SETTINGS ---------- */
+function vSettings(root){
+  root.append(h('h2',null,'ตั้งค่า'),h('p',{class:'sub'},'ค่ากลางที่ใช้กับทุกรายงาน ทุกสูตร และไฟล์ Excel ที่ดาวน์โหลด'));
+  const fld=(label,inp,hint)=>h('label',{class:'fld'},label,inp,hint?h('span',{style:'font-size:11px'},hint):null);
+  const commit=fn=>e=>{fn(e.target.value);saveSettings();};
+  const baseSel=h('select',{onchange:commit(v=>{S.set.base=v;})},h('option',{value:'std',selected:S.set.base!=='op'},'เวลามาตรฐานของแต่ละแถว'),h('option',{value:'op',selected:S.set.base==='op'},'ชั่วโมงเดินเครื่องคงที่ (ด้านล่าง)'));
+  root.append(h('div',{class:'set'},
+    fld('เดือนที่รายงาน',h('input',{type:'month',value:S.set.month,onchange:commit(v=>{if(v)S.set.month=v;})}),'ใช้กับแท็บสรุปผลและช่วง W1–W5'),
+    fld('Target Uptime (%)',h('input',{type:'number',min:'0',max:'150',step:'1',value:String(Math.round(S.set.target*100)),onchange:commit(v=>{S.set.target=num(v)/100;})}),'เส้นแบ่งสีเขียว/แดงของ Uptime เวลาจริง'),
+    fld('ฐานเวลาของ Uptime',baseSel,'Uptime = (เวลามาตรฐาน − เวลาสูญเสีย) ÷ ฐานเวลา'),
+    fld('ชั่วโมงเดินเครื่อง/กะ',h('input',{type:'number',min:'0',step:'0.01',value:String(S.set.op),onchange:commit(v=>{S.set.op=num(v)||10.5;})}),'ใช้เป็นเวลามาตรฐานตั้งต้น และคำนวณ Target 100%'),
+    fld('Work Efficiency ตั้งต้น (%)',h('input',{type:'number',min:'1',max:'100',step:'1',value:String(Math.round(S.set.eff*100)),onchange:commit(v=>{S.set.eff=(num(v)||70)/100;})}),'ใช้คำนวณ CAPA (เครื่องตั้งค่าเองได้)')));
+  root.append(h('div',{class:'sec'},'ช่วงสัปดาห์ในเดือน (วันที่เริ่ม – สิ้นสุด)'),
+    h('div',{class:'set'},S.set.weeks.map((w,i)=>h('div',{class:'fld'},'W'+(i+1),h('div',{style:'display:flex;gap:6px;align-items:center'},
+      h('input',{type:'number',min:'1',max:'31',value:String(w[0]),style:'width:70px',onchange:commit(v=>{S.set.weeks[i]=[num(v),S.set.weeks[i][1]];})}),'–',
+      h('input',{type:'number',min:'1',max:'31',value:String(w[1]),style:'width:70px',onchange:commit(v=>{S.set.weeks[i]=[S.set.weeks[i][0],num(v)];})}))))));
+  root.append(h('div',{class:'sec'},'สาเหตุการหยุดเครื่อง 16 ข้อ (ตามหัวตารางเดิม)'),
+    h('div',{class:'legend',style:'max-width:900px'},CAUSES.map((c,i)=>h('span',null,h('b',null,String(i+1)+'.'),' '+c[0]+' / '+c[1]+' / '+c[2]))),
+    h('p',{class:'hint'},'ในไฟล์ Excel ที่ดาวน์โหลด เพิ่มสาเหตุใหม่ได้โดยแทรกคอลัมน์ในชีต “กรอกข้อมูล” ระหว่างเครื่องหมาย ◀ กับ ▶ ชีต Pareto และรายละเอียดสาเหตุจะรวมคอลัมน์ใหม่ให้เอง'));
+}
+
+setSync();render();init();
+})();
+</script>
